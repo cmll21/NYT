@@ -1,8 +1,12 @@
 WLEN = 5
 COLOURS = {0: "⬜", 1: "🟨", 2: "🟩"}
+CANDIDATES_FILE = "answers-alphabetical.txt"
+WORDS_FILE = "allowed-guesses.txt"
 
 import numpy as np
 import pandas as pd
+from functools import lru_cache
+from contextlib import contextmanager
 import sys
 import time
 
@@ -14,7 +18,8 @@ class Dashboard:
         sys.stdout.write("\033[J")
 
     @staticmethod
-    def draw_dashboard(target: str, guesses: list, feedbacks: list, distribution: list, total: int, start_time: float):
+    def draw_dashboard(target: str, guesses: list, feedbacks: list, 
+                       distribution: list, total: int, start_time: float):
         """
         Draws the Wordle dashboard with the given information.
         """
@@ -50,15 +55,29 @@ class Dashboard:
         sys.stdout.flush()
 
     @staticmethod
-    def progress_bar(current: int, total: int, bar_length: int = 50, start_time: float = None):
+    def progress_bar(current: int, total: int, bar_length: int = 25, start_time: float = None):
         """
         Displays a progress bar for the current progress out of the total.
         """
+        # Total units available (each character can have 8 levels of fill)
+        total_units = bar_length * 8
+        # Calculate how many units should be filled based on progress
+        filled_units = int((current / total) * total_units)
+        
+        bar = ""
+        for _ in range(bar_length):
+            if filled_units >= 8:
+                # Full block if 8 or more units are available for this slot.
+                bar += "█"  # U+2588
+                filled_units -= 8
+            else:
+                # Choose the appropriate partial block character.
+                # Mapping: 0->" " (empty), 1->"▏", 2->"▎", 3->"▍", 4->"▌",
+                #          5->"▋", 6->"▊", 7->"▉"
+                partials = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉"]
+                bar += partials[filled_units]
+                filled_units = 0
         fraction = current / total
-        arrow_count = int(fraction * bar_length)
-        space_count = bar_length - arrow_count
-        bar = '[' + '#' * arrow_count + ' ' * space_count + ']'
-        percent = int(fraction * 100)
         
         # Calculate estimated time remaining
         if current > 0 and start_time is not None:
@@ -71,7 +90,7 @@ class Dashboard:
             time_remaining_str = "Calculating..."
 
         # Build and write the progress bar line
-        sys.stdout.write(f'\r{bar} {percent}% | {time_remaining_str}')
+        sys.stdout.write(f'\r[{bar}] {fraction*100:.1f}% | {time_remaining_str}')
         sys.stdout.flush()
 
     @staticmethod
@@ -91,6 +110,7 @@ class WordleGame:
         self.target = target.lower()
     
     @staticmethod
+    @lru_cache(maxsize=None)
     def score_guess(guess: str, target: str) -> tuple:
         """
         Scores a guess against a given target word.
@@ -134,8 +154,8 @@ class WordleSolver:
         """
         Filters the candidate words based on the feedback from a guess.
         """
-        self.candidates = self.candidates[self.candidates.apply(lambda x: WordleGame.score_guess(guess, x) == feedback)]
-        
+        self.candidates = self.candidates[self.candidates.apply(
+            lambda x: WordleGame.score_guess(guess, x) == feedback)]
     
     def select_best_guess(self) -> str:
         """
@@ -195,6 +215,15 @@ class SolutionTester:
         self.all_words = all_words
         self.distribution = [0] * 6
         
+    @contextmanager
+    def hidden_cursor():
+        sys.stdout.write("\033[?25l")
+        sys.stdout.flush()
+        try:
+            yield
+        finally:
+            sys.stdout.write("\033[?25h")
+            sys.stdout.flush()
 
     def test_solver(self):
         """
@@ -204,7 +233,7 @@ class SolutionTester:
         for target in self.all_candidates:
             self.test_target(target)
         
-        print("\n\nAll games completed!")
+        print(f"\n{len(self.all_candidates)} games played, {time.perf_counter() - self.start_time:.2f}s elapsed.")
 
     def test_target(self, target: str):
         """
@@ -214,11 +243,10 @@ class SolutionTester:
         game = WordleGame(target)
         guesses, feedbacks = solver.solve_wordle(game)
         self.distribution[len(guesses) - 1] += 1
-        self.dashboard.draw_dashboard(target, guesses, feedbacks, self.distribution, len(self.all_candidates), self.start_time)
+        self.dashboard.draw_dashboard(target, guesses, feedbacks, self.distribution, 
+                                      len(self.all_candidates), self.start_time)
 
-
-
-def main(all_candidates_file: str = "answers-alphabetical.txt", all_words_file: str = "allowed-guesses.txt"):
+def main(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE):
 
     # Load and clean the target words.
     all_candidates = pd.read_csv(all_candidates_file, header=None, names=["word"])
@@ -236,6 +264,4 @@ def main(all_candidates_file: str = "answers-alphabetical.txt", all_words_file: 
 
 # Main function to run the game and solver.
 if __name__ == "__main__":
-    
     main()
-
