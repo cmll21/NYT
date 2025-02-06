@@ -1,3 +1,4 @@
+INITIAL_GUESS = "slate"
 WLEN = 5
 COLOURS = {0: "⬜", 1: "🟨", 2: "🟩"}
 CANDIDATES_FILE = "answers-alphabetical.txt"
@@ -176,7 +177,7 @@ class WordleSolver:
         best_index = scores.index(max(scores))
         return self.candidates[best_index]
     
-    def solve_wordle(self, game: WordleGame, max_guesses: int = 6) -> tuple:
+    def solve_wordle(self, game: WordleGame, max_guesses: int = 6, guess: str = None) -> tuple:
         """
         Solves the Wordle game by interacting with a WordleGame instance.
         Returns a tuple containing the list of guesses made, their feedback, and remaining candidate counts.
@@ -186,7 +187,8 @@ class WordleSolver:
         remaining = []
         
         # Make an initial guess from the candidate list.
-        guess = self.select_best_guess()
+        if guess is None:
+            guess = self.select_best_guess()
         
         for _ in range(max_guesses):
             guesses.append(guess)
@@ -226,31 +228,34 @@ class SolutionTester:
             sys.stdout.write("\033[?25h")
             sys.stdout.flush()
 
-    def test_solver(self):
+    def test_solver(self, initial_guess: str = None):
         """
         Tests the solver on all target words.
         """
         self.start_time = time.perf_counter()
         with self.hidden_cursor():
             for target in self.all_candidates:
-                self.test_target(target)
+                self.test_target(target, initial_guess=initial_guess)
         
         elapsed = time.perf_counter() - self.start_time
         print(f"\n{len(self.all_candidates)} games played, {elapsed:.2f}s elapsed.")
 
-    def test_target(self, target: str):
+    def test_target(self, target: str, initial_guess: str = None):
         """
         Tests the solver on a specific target word.
         """
         solver = WordleSolver(self.all_candidates, self.all_words)
         game = WordleGame(target)
-        guesses, feedbacks, remaining = solver.solve_wordle(game)
+        guesses, feedbacks, remaining = solver.solve_wordle(game, guess=initial_guess)
         self.distribution[len(guesses) - 1] += 1
         # Pass the remaining candidate counts plus a trailing 0 to the dashboard.
         self.dashboard.draw_dashboard(target, guesses, feedbacks, self.distribution, remaining + [0],
                                       len(self.all_candidates), self.start_time)
 
 def main(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE):
+
+    initial_guess = INITIAL_GUESS if len(INITIAL_GUESS) == WLEN else None
+
     # Load and clean the target words from file.
     with open(all_candidates_file, "r") as f:
         all_candidates = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
@@ -261,7 +266,7 @@ def main(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS
 
     dashboard = Dashboard()
     tester = SolutionTester(all_candidates, all_words, dashboard)
-    tester.test_solver()
+    tester.test_solver(initial_guess=initial_guess)
 
 if __name__ == "__main__":
     main()
