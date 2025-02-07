@@ -336,11 +336,11 @@ class SolutionTester:
 
     def test_solver(self, initial_guess: str = None) -> None:
         """Tests the solver on all target words."""
-        start_time = time.perf_counter()
+        self.start_time = time.perf_counter()
         with self.hidden_cursor():
             for target in self.all_candidates:
                 self.test_target(target, initial_guess)
-        elapsed = time.perf_counter() - start_time
+        elapsed = time.perf_counter() - self.start_time
         print(f"\n{len(self.all_candidates)} games played, {elapsed:.2f}s elapsed.")
 
     def test_target(self, target: str, initial_guess: str = None) -> None:
@@ -357,7 +357,7 @@ class SolutionTester:
         dashboard_remaining = remaining + [0]  
         self.dashboard.draw_dashboard(str(solver), target, guesses, feedbacks,
                                       self.distribution, dashboard_remaining,
-                                      len(self.all_candidates), time.perf_counter())
+                                      len(self.all_candidates), self.start_time)
 
 
 ###############################################################################
@@ -376,7 +376,7 @@ def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = W
         all_words = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
 
     dashboard = Dashboard()
-    tester = SolutionTester(all_candidates, all_words, dashboard, "hybrid")
+    tester = SolutionTester(all_candidates, all_words, dashboard, "frequency")
     tester.test_solver(initial_guess)
 
 
