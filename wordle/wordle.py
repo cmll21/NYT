@@ -21,6 +21,7 @@ COLOURS: Dict[int, str] = {0: "⬜", 1: "🟨", 2: "🟩"}
 CANDIDATES_FILE: str = "answers-alphabetical.txt"
 WORDS_FILE: str = "allowed-guesses.txt"
 UPDATE_FREQ: int = 1
+THRESH: int = 3000 # Switch to word list when candidates fall below this threshold
 M, C = 3/20, 3/2
 
 
@@ -193,26 +194,30 @@ class WordleSolver:
         self.candidates = [word for word in self.candidates
                            if WordleGame.score_guess(guess, word) == feedback]
 
+    def switch_list(self) -> None:
+        if len(self.candidates) <= THRESH and self.words != self.candidates:
+            self.words = self.candidates
+
     def select_guess_frequency(self) -> str:
         """
         Chooses a guess based on letter frequency across candidate words.
         Each candidate is scored by summing frequencies for its unique letters.
         """
+        self.switch_list()
         letters = "abcdefghijklmnopqrstuvwxyz"
         freq = {letter: sum(word.count(letter) for word in self.candidates)
                 for letter in letters}
         scores = [sum(freq.get(letter, 0) for letter in set(word))
-                  for word in self.candidates]
+                  for word in self.words]
         best_index = scores.index(max(scores))
-        return self.candidates[best_index]
+        return self.words[best_index]
 
     def select_guess_entropy(self) -> str:
         """
         Chooses a guess using an entropy-based strategy.
         Returns a candidate when there are only a couple of possibilities left.
         """
-        if len(self.candidates) <= 2:
-            return self.candidates[0]
+        self.switch_list()
         max_entropy = -1.0
         best_guess = self.candidates[0]
         for guess in self.words:
@@ -227,9 +232,7 @@ class WordleSolver:
         """
         Chooses a guess using a hybrid strategy that minimizes expected guesses.
         """
-        if len(self.candidates) <= 1:
-            return self.candidates[0]
-
+        self.switch_list()
         min_expected = float("inf")
         best_guess = self.candidates[0]
         for guess in self.words:
@@ -276,8 +279,8 @@ class WordleSolver:
 
         if guess not in self.candidates:
             return 0.0
-        return 1 / len(self.candidates)    
-
+        return 1 / len(self.candidates)   
+    
     def solve_wordle(self, game: WordleGame, max_guesses: int = 6, guess: str = None) -> Tuple[List[str], List[Tuple[int, ...]], List[int]]:
         """
         Solves the Wordle game by iteratively making guesses.
@@ -365,7 +368,10 @@ class SolutionTester:
 ###############################################################################
 def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE) -> None:
     """Loads words from files and runs the simulation."""
-    initial_guess = INITIAL_GUESS if len(INITIAL_GUESS) == WLEN else None
+    if INITIAL_GUESS is not None and len(INITIAL_GUESS) != WLEN:
+        initial_guess = None
+    else:
+        initial_guess = INITIAL_GUESS
 
     # Load and filter target words (one word per line with the correct length)
     with open(all_candidates_file, "r") as f:
