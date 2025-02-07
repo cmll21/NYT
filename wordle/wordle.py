@@ -4,11 +4,14 @@ COLOURS = {0: "⬜", 1: "🟨", 2: "🟩"}
 CANDIDATES_FILE = "answers-alphabetical.txt"
 WORDS_FILE = "allowed-guesses.txt"
 UPDATE_FREQ = 1
+M, C = 3/20, 3/2
 
 import sys
 import time
 from functools import lru_cache
 from contextlib import contextmanager
+from typing import Callable as function
+from collections import defaultdict
 import pandas as pd
 import numpy as np
 
@@ -164,7 +167,7 @@ class WordleSolver:
         self.candidates = [word for word in self.candidates 
                            if WordleGame.score_guess(guess, word) == feedback]
     
-    def select_best_guess(self) -> str:
+    def select_guess_frequency(self) -> str:
         """
         Selects the best next guess from the candidate words.
         This version uses letter frequency over the candidates and only counts unique letters.
@@ -177,7 +180,75 @@ class WordleSolver:
         best_index = scores.index(max(scores))
         return self.candidates[best_index]
     
-    def solve_wordle(self, game: WordleGame, max_guesses: int = 6, guess: str = None) -> tuple:
+    def select_guess_entropy(self) -> str:
+        """
+        Selects the best next guess from the candidate words.
+        """
+        if len(self.candidates) <= 2:
+            return best_guess
+        max_entropy = -1
+        best_guess = self.candidates[0]
+        for guess in self.words:
+            entropy = self.expected_information_gain(guess)
+            if entropy > max_entropy:
+                max_entropy = entropy
+                best_guess = guess
+        self.words.remove(best_guess)
+        return best_guess
+    
+    def select_guess_hybrid(self) -> str:
+        """
+        Selects the best next guess from the candidate words.
+        """
+        min_guesses = float("inf")
+        best_guess = self.candidates[0]
+        if len(self.candidates) <= 1:
+            return best_guess
+        for guess in self.words:
+            expected = self.expected_guesses(guess)
+            if expected < min_guesses:
+                min_guesses = expected
+                best_guess = guess
+        self.words.remove(best_guess)
+        return best_guess
+    
+    def expected_information_gain(self, guess: str) -> float:
+        """
+        Calculates the expected information gain from making a guess.
+        """
+        # Count the frequency of each feedback for the candidate list.
+        feedback_counts = defaultdict(int)
+        for target in self.candidates:
+            feedback = WordleGame.score_guess(guess, target)
+            feedback_counts[feedback] += 1
+        
+        # Calculate the entropy of the feedback distribution.
+        total = len(self.candidates)
+        entropy = 0
+        for count in feedback_counts.values():
+            p = count / total
+            entropy -= p * np.log2(p)
+        return entropy
+    
+    def entropy_to_guesses(self, entropy: float) -> float:
+        return entropy * M + C
+    
+    def expected_guesses(self, guess: str) -> float:
+        """
+        Calculates the expected number of guesses needed to solve the game.
+        """
+        uncertainty = sum([self.probability_of_guess(candidate) * np.log2(self.probability_of_guess(candidate)) for candidate in self.candidates])
+        p = self.probability_of_guess(guess)
+        expected = (1-p)*self.entropy_to_guesses(uncertainty - self.expected_information_gain(guess))
+        return expected
+        
+
+    def probability_of_guess(self, guess: str) -> float:
+        # return len([word for word in self.candidates if guess in word]) / len(self.candidates)
+        return 1/len(self.candidates)
+
+
+    def solve_wordle(self, game: WordleGame, strategy: function, max_guesses: int = 6, guess: str = None) -> tuple:
         """
         Solves the Wordle game by interacting with a WordleGame instance.
         Returns a tuple containing the list of guesses made, their feedback, and remaining candidate counts.
@@ -188,7 +259,7 @@ class WordleSolver:
         
         # Make an initial guess from the candidate list.
         if guess is None:
-            guess = self.select_best_guess()
+            guess = strategy()
         
         for _ in range(max_guesses):
             guesses.append(guess)
@@ -204,7 +275,7 @@ class WordleSolver:
                 print("No candidates left to guess!")
                 break
             
-            guess = self.select_best_guess()
+            guess = strategy()
         
         return guesses, feedbacks, remaining
 
@@ -246,19 +317,18 @@ class SolutionTester:
         """
         solver = WordleSolver(self.all_candidates, self.all_words)
         game = WordleGame(target)
-        guesses, feedbacks, remaining = solver.solve_wordle(game, guess=initial_guess)
+        guesses, feedbacks, remaining = solver.solve_wordle(game, strategy = solver.select_guess_hybrid, guess=initial_guess)
         self.distribution[len(guesses) - 1] += 1
         # Pass the remaining candidate counts plus a trailing 0 to the dashboard.
         self.dashboard.draw_dashboard(target, guesses, feedbacks, self.distribution, remaining + [0],
                                       len(self.all_candidates), self.start_time)
 
-def main(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE):
+def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE):
 
     initial_guess = INITIAL_GUESS if len(INITIAL_GUESS) == WLEN else None
 
     # Load and clean the target words from file.
-    with open(all_candidates_file, "r") as f:
-        all_candidates = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
+    with open(all_candidates_file, "r") as f:        all_candidates = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
 
     # Load and clean the allowed guesses from file.
     with open(all_words_file, "r") as f:
@@ -267,6 +337,9 @@ def main(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS
     dashboard = Dashboard()
     tester = SolutionTester(all_candidates, all_words, dashboard)
     tester.test_solver(initial_guess=initial_guess)
+
+def main():
+    simulate()
 
 if __name__ == "__main__":
     main()
