@@ -36,43 +36,55 @@ class Dashboard:
         sys.stdout.write("\033[H\033[J")
 
     @staticmethod
-    def draw_dashboard(version: str,
-                       target: str,
-                       guesses: List[str],
-                       feedbacks: List[Tuple[int, ...]],
-                       distribution: List[int],
-                       remaining: List[int],
-                       total: int,
-                       start_time: float) -> None:
+    def draw_dashboard(version: str = None,
+                       target: str = None,
+                       guesses: List[str] = None,
+                       feedbacks: List[Tuple[int, ...]] = None,
+                       distribution: List[int] = None,
+                       remaining: List[int] = None,
+                       total: int = None,
+                       start_time: float = None,
+                       best_guess: str = None) -> None:
         """
         Draws the Wordle dashboard with the given simulation information.
         Only updates every UPDATE_FREQ games.
         """
-        if sum(distribution) % UPDATE_FREQ != 0:
+        if distribution is not None and sum(distribution) % UPDATE_FREQ != 0:
             return
 
         # Clear screen and reposition cursor
         sys.stdout.write("\033[H\033[J")
 
         # Write header and game info
-        sys.stdout.write(f"Version: {version}\n")
-        sys.stdout.write(f"Score: {len(feedbacks)}\n")
-        sys.stdout.write(f"Target: {target}\n")
-        sys.stdout.write(f"Guesses: {guesses}\n")
-        sys.stdout.write(f"Remaining: {remaining}\n")
+        if version is not None:
+            sys.stdout.write(f"Version: {version}\n")
+        if feedbacks is not None:
+            sys.stdout.write(f"Score: {len(feedbacks)}\n")
+        if target is not None:
+            sys.stdout.write(f"Target: {target}\n")
+        if guesses is not None:
+            sys.stdout.write(f"Guesses: {guesses}\n")
+        if remaining is not None:
+            sys.stdout.write(f"Remaining: {remaining}\n")
 
         # Display feedback rows with colours
-        rows = 0
-        for fb in feedbacks:
-            sys.stdout.write("".join(COLOURS[col] for col in fb) + "\n")
-            rows += 1
-        sys.stdout.write("\n" * (6 - rows))
+        if feedbacks is not None:
+            rows = 0
+            for fb in feedbacks:
+                sys.stdout.write("".join(COLOURS[col] for col in fb) + "\n")
+                rows += 1
+            sys.stdout.write("\n" * (6 - rows))
+
+        if best_guess is not None:
+            sys.stdout.write(f"Best Guess: {best_guess}\n")
 
         # Display game distribution and average score
-        sys.stdout.write(f"Distribution: {distribution}\n")
-        sys.stdout.write(f"Average: {Dashboard.get_average(distribution):.2f}\n\n")
-
-        Dashboard.progress_bar(sum(distribution), total, start_time=start_time)
+        if distribution is not None:
+            sys.stdout.write(f"Distribution: {distribution}\n")
+            sys.stdout.write(f"Average: {Dashboard.get_average(distribution):.2f}\n\n")
+        if start_time is not None:
+            Dashboard.progress_bar(sum(distribution), total, start_time=start_time)
+        
 
     @staticmethod
     def clear_screen() -> None:
@@ -385,9 +397,34 @@ def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = W
     tester = SolutionTester(all_candidates, all_words, dashboard, "frequency")
     tester.test_solver(initial_guess)
 
+def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE) -> None:
+    """Loads words from files and runs solver on a single target word."""
+     # Load and filter target words (one word per line with the correct length)
+    with open(all_candidates_file, "r") as f:
+        all_candidates = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
+
+    # Load and filter allowed guesses.
+    with open(all_words_file, "r") as f:
+        all_words = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
+
+    dashboard = Dashboard()
+    solver = WordleSolver(all_candidates, all_words, version="frequency")
+    print(str(solver))
+    guess, feedbacks, feedback = "", [], ()
+    dashboard.draw_dashboard(version=str(solver), feedbacks=feedbacks, best_guess=solver.strategy())
+    while feedback != (2,) * WLEN:
+        guess, feedback = "", []
+        while len(guess) != WLEN or not guess.isalpha():
+            guess = input("Guess: ").lower()
+        while len(feedback) != WLEN or not all([c in (0, 1, 2) for c in feedback]):
+            feedback = tuple([int(c) for c in input("Feedback: ")])
+        feedbacks.append(feedback)
+        solver.filter_candidates(guess, feedback)
+        dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.strategy())
+
 
 def main() -> None:
-    simulate()
+    manual()
 
 
 if __name__ == "__main__":
