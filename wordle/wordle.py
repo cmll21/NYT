@@ -22,7 +22,7 @@ COLOURS: Dict[int, str] = {MISS: "⬜", CLOSE: "🟨", HIT: "🟩"}
 CANDIDATES_FILE: str = "answers-alphabetical.txt"
 WORDS_FILE: str = "allowed-guesses.txt"
 UPDATE_FREQ: int = 1
-THRESH: int = 50 # Switch to word list when candidates fall below this threshold
+THRESH: int = 1000 # Switch to word list when candidates fall below this threshold
 M, C = 3/20, 3/2
 
 
@@ -186,7 +186,7 @@ class WordleSolver:
     Strategies available: 'frequency', 'entropy', and 'hybrid'.
     """
 
-    def __init__(self, all_candidates: List[str], all_words: List[str], version: str = "frequency") -> None:
+    def __init__(self, all_candidates: set[str], all_words: set[str], version: str = "frequency") -> None:
         self.version: str = version.lower()
         self.strategy = {
             "frequency": self.select_guess_frequency,
@@ -194,8 +194,8 @@ class WordleSolver:
             "hybrid": self.select_guess_hybrid
         }[self.version]
         # Working copies of candidate and allowed words.
-        self.candidates: List[str] = all_candidates[:]
-        self.words: List[str] = all_words[:]
+        self.candidates: set[str] = all_candidates.copy()
+        self.words: set[str] = all_words.copy()
 
     def __str__(self) -> str:
         return self.version
@@ -204,8 +204,8 @@ class WordleSolver:
         """
         Filters candidate words based on feedback from a guess.
         """
-        self.candidates = [word for word in self.candidates
-                           if WordleGame.score_guess(guess, word) == feedback]
+        self.candidates = {word for word in self.candidates
+                           if WordleGame.score_guess(guess, word) == feedback}
 
     def switch_list(self) -> None:
         if len(self.candidates) <= THRESH and self.words != self.candidates:
@@ -220,10 +220,10 @@ class WordleSolver:
         letters = "abcdefghijklmnopqrstuvwxyz"
         freq = {letter: sum(word.count(letter) for word in self.candidates)
                 for letter in letters}
-        scores = [sum(freq.get(letter, 0) for letter in set(word))
-                  for word in self.words]
-        best_index = scores.index(max(scores))
-        return self.words[best_index]
+        best_guess = max(self.words,
+                         key=lambda word: sum(freq.get(letter, 0) for letter in set(word)))
+        self.words.remove(best_guess)
+        return best_guess
 
     def select_guess_entropy(self) -> str:
         """
@@ -232,7 +232,7 @@ class WordleSolver:
         """
         self.switch_list()
         max_entropy = -1.0
-        best_guess = self.candidates[0]
+        best_guess = next(iter(self.candidates))
         for guess in self.words:
             entropy = self.expected_information_gain(guess)
             if entropy > max_entropy:
@@ -247,7 +247,7 @@ class WordleSolver:
         """
         self.switch_list()
         min_expected = float("inf")
-        best_guess = self.candidates[0]
+        best_guess = next(iter(self.candidates))
         for guess in self.words:
             expected = self.expected_guesses(guess)
             if expected < min_expected:
@@ -332,7 +332,7 @@ class WordleSolver:
 class SolutionTester:
     """Tests the WordleSolver against all target words and updates the dashboard."""
 
-    def __init__(self, all_candidates: List[str], all_words: List[str], dashboard: Dashboard, version: str) -> None:
+    def __init__(self, all_candidates: set[str], all_words: set[str], dashboard: Dashboard, version: str) -> None:
         self.dashboard = dashboard
         self.all_candidates = all_candidates  # Target words
         self.all_words = all_words            # Allowed guesses
@@ -388,11 +388,11 @@ def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = W
 
     # Load and filter target words (one word per line with the correct length)
     with open(all_candidates_file, "r") as f:
-        all_candidates = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
+        all_candidates = {line.strip().lower() for line in f if len(line.strip()) == WLEN}
 
     # Load and filter allowed guesses.
     with open(all_words_file, "r") as f:
-        all_words = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
+        all_words = {line.strip().lower() for line in f if len(line.strip()) == WLEN}
 
     dashboard = Dashboard()
     tester = SolutionTester(all_candidates, all_words, dashboard, version=version)
@@ -402,11 +402,11 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
     """Loads words from files and runs solver on a single target word."""
      # Load and filter target words (one word per line with the correct length)
     with open(all_candidates_file, "r") as f:
-        all_candidates = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
+        all_candidates = {line.strip().lower() for line in f if len(line.strip()) == WLEN}
 
     # Load and filter allowed guesses.
     with open(all_words_file, "r") as f:
-        all_words = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
+        all_words = {line.strip().lower() for line in f if len(line.strip()) == WLEN}
 
     dashboard = Dashboard()
     solver = WordleSolver(all_candidates, all_words, version=version)
