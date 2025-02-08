@@ -17,11 +17,12 @@ import numpy as np
 # Global Constants
 INITIAL_GUESS: str = "slate"
 WLEN: int = 5
-COLOURS: Dict[int, str] = {0: "⬜", 1: "🟨", 2: "🟩"}
+MISS, CLOSE, HIT = np.uint8(0), np.uint8(1), np.uint8(2)
+COLOURS: Dict[int, str] = {MISS: "⬜", CLOSE: "🟨", HIT: "🟩"}
 CANDIDATES_FILE: str = "answers-alphabetical.txt"
 WORDS_FILE: str = "allowed-guesses.txt"
 UPDATE_FREQ: int = 1
-THRESH: int = 3000 # Switch to word list when candidates fall below this threshold
+THRESH: int = 50 # Switch to word list when candidates fall below this threshold
 M, C = 3/20, 3/2
 
 
@@ -155,18 +156,18 @@ class WordleGame:
           - 2: letter in the correct position (green)
         """
         target_chars = list(target)
-        score = [0] * WLEN
+        score = [MISS] * WLEN
 
         # First pass: mark greens and mark letters as used.
         for i in range(WLEN):
             if guess[i] == target[i]:
-                score[i] = 2
+                score[i] = HIT
                 target_chars[i] = None
 
         # Second pass: mark yellows.
         for i in range(WLEN):
             if score[i] == 0 and guess[i] in target_chars:
-                score[i] = 1
+                score[i] = CLOSE
                 target_chars[target_chars.index(guess[i])] = None
 
         return tuple(score)
@@ -282,7 +283,7 @@ class WordleSolver:
         """
 
         p = self.probability_of_guess(guess)
-        current_uncertainty = sum([self.probability_of_guess(candidate) * np.log2(self.probability_of_guess(candidate)) for candidate in self.candidates])
+        current_uncertainty = np.log2(1 / len(self.candidates))
         expected = (1 - p) * self.entropy_to_guesses(current_uncertainty - self.expected_information_gain(guess))
         return expected
 
@@ -291,7 +292,7 @@ class WordleSolver:
 
         if guess not in self.candidates:
             return 0.0
-        return 1 / len(self.candidates)   
+        return 1 / len(self.candidates)
     
     def solve_wordle(self, game: WordleGame, max_guesses: int = 6, guess: str = None) -> Tuple[List[str], List[Tuple[int, ...]], List[int]]:
         """
@@ -311,7 +312,7 @@ class WordleSolver:
             feedback = game.make_guess(guess)
             feedbacks.append(feedback)
 
-            if feedback == (2,) * WLEN:
+            if feedback == (HIT,) * WLEN:
                 break
 
             self.filter_candidates(guess, feedback)
@@ -378,7 +379,7 @@ class SolutionTester:
 ###############################################################################
 # Simulation Functions
 ###############################################################################
-def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE) -> None:
+def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, version: str = "frequency") -> None:
     """Loads words from files and runs the simulation."""
     if INITIAL_GUESS is not None and len(INITIAL_GUESS) != WLEN:
         initial_guess = None
@@ -394,10 +395,10 @@ def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = W
         all_words = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
 
     dashboard = Dashboard()
-    tester = SolutionTester(all_candidates, all_words, dashboard, "frequency")
+    tester = SolutionTester(all_candidates, all_words, dashboard, version=version)
     tester.test_solver(initial_guess)
 
-def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE) -> None:
+def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, version: str = "frequency") -> None:
     """Loads words from files and runs solver on a single target word."""
      # Load and filter target words (one word per line with the correct length)
     with open(all_candidates_file, "r") as f:
@@ -408,15 +409,15 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
         all_words = [line.strip().lower() for line in f if len(line.strip()) == WLEN]
 
     dashboard = Dashboard()
-    solver = WordleSolver(all_candidates, all_words, version="frequency")
+    solver = WordleSolver(all_candidates, all_words, version=version)
     print(str(solver))
     guess, feedbacks, feedback = "", [], ()
     dashboard.draw_dashboard(version=str(solver), feedbacks=feedbacks, best_guess=solver.strategy())
-    while feedback != (2,) * WLEN:
+    while feedback != (HIT,) * WLEN:
         guess, feedback = "", []
         while len(guess) != WLEN or not guess.isalpha():
             guess = input("Guess: ").lower()
-        while len(feedback) != WLEN or not all([c in (0, 1, 2) for c in feedback]):
+        while len(feedback) != WLEN or not all([c in (COLOURS.keys()) for c in feedback]):
             feedback = tuple([int(c) for c in input("Feedback: ")])
         feedbacks.append(feedback)
         solver.filter_candidates(guess, feedback)
@@ -424,7 +425,7 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
 
 
 def main() -> None:
-    manual()
+    simulate(version="hybrid")
 
 
 if __name__ == "__main__":
