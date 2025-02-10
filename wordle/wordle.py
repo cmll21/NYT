@@ -22,7 +22,7 @@ COLOURS: Dict[int, str] = {MISS: "⬜", CLOSE: "🟨", HIT: "🟩"}
 CANDIDATES_FILE: str = "answers-alphabetical.txt"
 WORDS_FILE: str = "allowed-guesses.txt"
 UPDATE_FREQ: int = 1
-THRESH: int = 1000 # Switch to word list when candidates fall below this threshold
+THRESH: int = 3000 # Switch to word list when candidates fall below this threshold
 M, C = 3/20, 3/2
 
 
@@ -410,9 +410,11 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
 
     dashboard = Dashboard()
     solver = WordleSolver(all_candidates, all_words, version=version)
-    print(str(solver))
+    
     guess, feedbacks, feedback = "", [], ()
+    
     dashboard.draw_dashboard(version=str(solver), feedbacks=feedbacks, best_guess=solver.strategy())
+
     while feedback != (HIT,) * WLEN:
         guess, feedback = "", []
         while len(guess) != WLEN or not guess.isalpha():
@@ -425,7 +427,7 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
 
 
 def main() -> None:
-    simulate(version="hybrid")
+    manual(version="hybrid")
 
 
 if __name__ == "__main__":
