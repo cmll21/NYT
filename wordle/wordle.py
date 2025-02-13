@@ -18,7 +18,11 @@ import numpy as np
 INITIAL_GUESS: str = "slate"
 WLEN: int = 5
 MISS, CLOSE, HIT = np.uint8(0), np.uint8(1), np.uint8(2)
-COLOURS: Dict[int, str] = {MISS: "⬜", CLOSE: "🟨", HIT: "🟩"}
+COLOURS: Dict[int, str] = {
+    MISS: "⬜", 
+    CLOSE: "🟨", 
+    HIT: "🟩"
+    }
 CANDIDATES_FILE: str = "answers-alphabetical.txt"
 WORDS_FILE: str = "allowed-guesses.txt"
 UPDATE_FREQ: int = 1
@@ -26,9 +30,9 @@ THRESH: int = 3000 # Switch to word list when candidates fall below this thresho
 M, C = 3/20, 3/2
 
 
-###############################################################################
+# =============================================================================
 # Dashboard Class
-###############################################################################
+# =============================================================================
 class Dashboard:
     """Handles drawing and updating the simulation dashboard in the terminal."""
 
@@ -136,9 +140,9 @@ class Dashboard:
         return total_guesses / total_games
 
 
-###############################################################################
+# =============================================================================
 # WordleGame Class
-###############################################################################
+# =============================================================================
 class WordleGame:
     """Represents a single Wordle game with a target word."""
 
@@ -177,9 +181,9 @@ class WordleGame:
         return WordleGame.score_guess(guess, self.target)
 
 
-###############################################################################
+# =============================================================================
 # WordleSolver Class
-###############################################################################
+# =============================================================================
 class WordleSolver:
     """
     Solves a Wordle game using one of several strategies.
@@ -326,9 +330,9 @@ class WordleSolver:
         return guesses, feedbacks, remaining
 
 
-###############################################################################
+# =============================================================================
 # SolutionTester Class
-###############################################################################
+# =============================================================================
 class SolutionTester:
     """Tests the WordleSolver against all target words and updates the dashboard."""
 
@@ -376,9 +380,9 @@ class SolutionTester:
                                       len(self.all_candidates), self.start_time)
 
 
-###############################################################################
+# =============================================================================
 # Simulation Functions
-###############################################################################
+# =============================================================================
 def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, version: str = "frequency") -> None:
     """Loads words from files and runs the simulation."""
     if INITIAL_GUESS is not None and len(INITIAL_GUESS) != WLEN:
