@@ -27,6 +27,7 @@ CLUSTERS = 4     # total clusters in the puzzle (16 words total)
 MISS = 0         # guess has ≤2 words correct
 CLOSE = 1        # guess is one off (exactly 3 words correct)
 HIT = 2          # guess exactly matches a solution cluster
+ANSWERS_FILE = "connections/answers.json"
 
 COLOURS = {
     0: "🟨",  # Level 0 = Yellow
@@ -287,7 +288,7 @@ def print_final_summary(game_id: int, guess_history: List[List[str]], word_to_le
 # ---------------------------
 if __name__ == "__main__":
     # Load games from the JSON file.
-    games = load_games("answers.json")
+    games = load_games(ANSWERS_FILE)
     random_game = pick_random_game(games)
     game_id = random_game["id"]
     solution = extract_solution(random_game)

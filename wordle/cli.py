@@ -19,11 +19,11 @@ def main():
     
     # File Inputs
     parser.add_argument(
-        "--words-file", type=str, default="allowed-guesses.txt",
+        "--words-file", type=str, default="wordle/allowed-guesses.txt",
         help="File containing allowed guess words."
     )
     parser.add_argument(
-        "--answers-file", type=str, default="answers-alphabetical.txt",
+        "--answers-file", type=str, default="wordle/answers-alphabetical.txt",
         help="File containing valid Wordle answers."
     )
     

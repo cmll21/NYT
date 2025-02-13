@@ -23,8 +23,8 @@ COLOURS: Dict[int, str] = {
     CLOSE: "🟨", 
     HIT: "🟩"
     }
-CANDIDATES_FILE: str = "answers-alphabetical.txt"
-WORDS_FILE: str = "allowed-guesses.txt"
+CANDIDATES_FILE: str = "wordle/answers-alphabetical.txt"
+WORDS_FILE: str = "wordle/allowed-guesses.txt"
 UPDATE_FREQ: int = 1
 THRESH: int = 3000 # Switch to word list when candidates fall below this threshold
 M, C = 3/20, 3/2

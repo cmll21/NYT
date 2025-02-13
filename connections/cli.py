@@ -78,7 +78,7 @@ def play_connections(filename: str, game_id: int = None, auto_solve: bool = True
 # ------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Connections Game Solver CLI")
-    parser.add_argument("--file", type=str, default="answers.json", help="Path to JSON file containing games")
+    parser.add_argument("--file", type=str, default="connections/answers.json", help="Path to JSON file containing games")
     parser.add_argument("--id", type=int, help="Select a specific game ID")
     parser.add_argument("--manual", action="store_true", help="Play manually instead of AI solving")
 
