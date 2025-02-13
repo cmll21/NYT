@@ -17,9 +17,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 import numpy as np
 from typing import List, Set, Dict, Tuple, Any
+from functools import lru_cache
 
 # ----------------------
-# Constants & Emoji Map
+# Constants & Colour Map
 # ----------------------
 WORDS = 4        # number of words per cluster (a guess)
 CLUSTERS = 4     # total clusters in the puzzle (16 words total)
@@ -167,6 +168,7 @@ class ConnectionsSolver:
         return [(label, words_list, cluster_confidence[label])
                 for label, words_list in sorted_clusters]
 
+    @lru_cache(maxsize=None)
     @staticmethod
     def word_similarity(word1: str, word2: str) -> float:
         """Compute the Wu–Palmer similarity between two words using WordNet."""
@@ -180,7 +182,7 @@ class ConnectionsSolver:
 
     def average_similarity(self, word: str, group: List[str]) -> float:
         """Compute the average similarity of 'word' with all the other words in 'group'."""
-        sims = [self.word_similarity(word, other) for other in group if other != word]
+        sims = [ConnectionsSolver.word_similarity(word, other) for other in group if other != word]
         return sum(sims) / len(sims) if sims else 0.0
 
     def get_initial_candidate(self, pool: List[str]) -> List[str]:
@@ -277,7 +279,7 @@ def print_final_summary(game_id: int, guess_history: List[List[str]], word_to_le
         # For each word in the guess, look up its level and map it to the corresponding emoji.
         row = "".join([COLOURS[word_to_level[word]] for word in guess])
         print(row)
-        
+
     print(f"\nTotal guesses: {len(guess_history)}")
 
 # ---------------------------

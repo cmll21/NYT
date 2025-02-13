@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 
 # Global Constants
-INITIAL_GUESS: str = "slate"
+INITIAL_GUESS: str = None
 WLEN: int = 5
 MISS, CLOSE, HIT = np.uint8(0), np.uint8(1), np.uint8(2)
 COLOURS: Dict[int, str] = {
@@ -383,12 +383,11 @@ class SolutionTester:
 # =============================================================================
 # Simulation Functions
 # =============================================================================
-def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, version: str = "frequency") -> None:
+def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, 
+             version: str = "frequency", initial_guess: str = INITIAL_GUESS) -> None:
     """Loads words from files and runs the simulation."""
-    if INITIAL_GUESS is not None and len(INITIAL_GUESS) != WLEN:
+    if initial_guess is not None and len(initial_guess) != WLEN:
         initial_guess = None
-    else:
-        initial_guess = INITIAL_GUESS
 
     # Load and filter target words (one word per line with the correct length)
     with open(all_candidates_file, "r") as f:
@@ -421,10 +420,21 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
 
     while feedback != (HIT,) * WLEN:
         guess, feedback = "", []
-        while len(guess) != WLEN or not guess.isalpha():
+        while True:
             guess = input("Guess: ").lower()
-        while len(feedback) != WLEN or not all([c in (COLOURS.keys()) for c in feedback]):
-            feedback = tuple([int(c) for c in input("Feedback: ")])
+            if len(guess) == WLEN and guess.isalpha():
+                break
+            print("Invalid input.")
+            
+        while True:
+            try:
+                feedback = tuple([int(c) for c in input("Feedback: ")])
+            except:
+                feedback = []
+            if len(feedback) == WLEN and all([c in (COLOURS.keys()) for c in feedback]):
+                break
+            print("Invalid input")
+            
         feedbacks.append(feedback)
         solver.filter_candidates(guess, feedback)
         dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.strategy())
