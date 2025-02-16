@@ -1,13 +1,6 @@
 import argparse
 from connections import simulate, manual
 
-
-def play_connections(filename: str, game_id: int = None, auto_solve: bool = True):
-    if auto_solve:
-        simulate(filename, game_id)
-    else:
-        manual(filename, game_id)
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Connections Game Solver CLI")
 
