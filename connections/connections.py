@@ -394,5 +394,8 @@ def manual(filename: str = "answers.json", game_id: int = None) -> None:
 # =============================================================================
 # Main Execution
 # =============================================================================
-if __name__ == "__main__":
+def main() -> None:
     manual()
+
+if __name__ == "__main__":
+    main()

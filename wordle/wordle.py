@@ -273,11 +273,8 @@ class WordleSolver:
             feedback_counts[fb] += 1
 
         total = len(self.candidates)
-        entropy = 0.0
-        for count in feedback_counts.values():
-            p = count / total
-            entropy -= p * np.log2(p)
-        return entropy
+        return -sum((count / total) * np.log2(count / total) for count in feedback_counts.values())
+
 
     def entropy_to_guesses(self, entropy: float) -> float:
         """Converts an entropy value to an estimated number of guesses using constants M and C."""
@@ -484,10 +481,12 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
         solver.filter_candidates(guess, feedback)
         dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.strategy())
 
+# =============================================================================
+# Main Execution
+# =============================================================================
 
 def main() -> None:
     manual(version="hybrid")
-
 
 if __name__ == "__main__":
     main()
