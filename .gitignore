@@ -176,3 +176,4 @@ cython_debug/
 .DS_Store
 wordle/test.py
 wordle/profile.txt
+connections/profile.txt

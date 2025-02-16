@@ -21,9 +21,15 @@ def main() -> None:
         help="Select a specific game ID"
     )
 
+    # Visualisation
+    parser.add_argument(
+        "--visualise", action="store_true",
+        help="Show visualisations after solving"
+    )
+
     args = parser.parse_args()
     if args.mode == "simulate":
-        simulate(filename = args.file, game_id = args.id)
+        simulate(filename = args.file, game_id = args.id, visualise = args.visualise)
     elif args.mode == "manual":
         manual(filename = args.file, game_id = args.id)
 

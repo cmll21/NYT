@@ -18,6 +18,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 from typing import List, Set, Dict, Tuple, Any
 from functools import lru_cache
+import matplotlib.pyplot as plt
 
 # =============================================================================
 # Constants & Colour Map
@@ -238,9 +239,10 @@ class ConnectionsSolver:
                 continue
 
             tried.add(candidate_tuple)
-            # Record the guess (order preserved)
-            self.guess_history.append(candidate.copy())
+            # Record (guess, feedback)
             feedback = game.check_guess(candidate)
+            self.guess_history.append((candidate.copy(), feedback))
+
             print("Guess:", candidate, "Feedback:", feedback)
 
             if feedback == HIT:
@@ -264,9 +266,9 @@ class ConnectionsSolver:
         return solved_clusters
 
 # =============================================================================
-# Final Summary Output Function
+# Output Functions
 # =============================================================================
-def print_final_summary(game_id: int, guess_history: List[List[str]], word_to_level: Dict[str, int]):
+def print_final_summary(game_id: int, guess_history: List[Tuple[List[str], int]], word_to_level: Dict[str, int]):
     """
     Print a summary of all guess attempts.
     Each row corresponds to one guess.
@@ -277,15 +279,42 @@ def print_final_summary(game_id: int, guess_history: List[List[str]], word_to_le
 
     for guess in guess_history:
         # For each word in the guess, look up its level and map it to the corresponding emoji.
-        row = "".join([COLOURS[word_to_level[word]] for word in guess])
+        row = "".join([COLOURS[word_to_level[word]] for word in guess[0]])
         print(row)
 
     print(f"\nTotal mistakes: {len(guess_history) - CLUSTERS}")
 
+def plot_results(guess_history: List[Tuple[List[str], int]]):
+    """Plot Connections solver results using Matplotlib."""
+    
+    # Pie Chart: Cluster Distribution
+    cluster_counts = [sum(1 for _, fb in guess_history if fb == i) for i in range(3)]
+
+    labels = ["Misses (🟨)", "Close (🟩)", "Correct (🟦)"]
+    colors = ["gold", "lightblue", "green"]
+
+    plt.figure(figsize=(10, 4))
+
+    plt.subplot(1, 2, 1)
+    plt.pie(cluster_counts, labels=labels, autopct="%1.1f%%", colors=colors, startangle=140)
+    plt.title("Connections Guess Distribution")
+
+    # Bar Chart: Guess Attempts
+    plt.subplot(1, 2, 2)
+    attempts = [i + 1 for i in range(len(guess_history))]
+    feedback_values = [fb for _, fb in guess_history]
+    plt.bar(attempts, feedback_values, color="blue")
+    plt.xlabel("Attempt Number")
+    plt.ylabel("Feedback Type (0 = Miss, 1 = Close, 2 = Correct)")
+    plt.title("Guess Feedback Over Time")
+
+    plt.tight_layout()
+    plt.show()
+
 # =============================================================================
 # Simulation Functions
 # =============================================================================
-def simulate(filename: str = "answers.json", game_id: int = None) -> None:
+def simulate(filename: str = "answers.json", game_id: int = None, visualise: bool = False) -> None:
     games = load_games(filename)
 
     # Select game by ID or randomly
@@ -311,6 +340,8 @@ def simulate(filename: str = "answers.json", game_id: int = None) -> None:
     print("\nPuzzle Solved\n")
     print(f"Solution: {solution}")
     print_final_summary(game_id, solver.guess_history, word_to_level)
+    if visualise:
+        plot_results(solver.guess_history)
 
 def manual(filename: str = "answers.json", game_id: int = None) -> None:
     games = load_games(filename)
@@ -347,7 +378,7 @@ def manual(filename: str = "answers.json", game_id: int = None) -> None:
 
         # Check guess
         feedback = game.check_guess(guess)
-        solver.guess_history.append(guess)
+        solver.guess_history.append((guess, feedback))
         
         # Display feedback
         print("Feedback:", "".join([COLOURS[word_to_level[word]] for word in guess]))

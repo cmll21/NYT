@@ -10,13 +10,15 @@ import time
 from functools import lru_cache
 from contextlib import contextmanager
 from collections import defaultdict
-from typing import List, Tuple, Dict, Generator
+from typing import List, Tuple, Dict
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Global Constants
 INITIAL_GUESS: str = None
 WLEN: int = 5
+MAX_GUESSES: int = 6
 MISS, CLOSE, HIT = np.uint8(0), np.uint8(1), np.uint8(2)
 COLOURS: Dict[int, str] = {
     MISS: "⬜", 
@@ -78,7 +80,7 @@ class Dashboard:
             for fb in feedbacks:
                 sys.stdout.write("".join(COLOURS[col] for col in fb) + "\n")
                 rows += 1
-            sys.stdout.write("\n" * (6 - rows))
+            sys.stdout.write("\n" * (MAX_GUESSES - rows))
 
         if best_guess is not None:
             sys.stdout.write(f"Best Guess: {best_guess}\n")
@@ -298,7 +300,7 @@ class WordleSolver:
             return 0.0
         return 1 / len(self.candidates)
     
-    def solve_wordle(self, game: WordleGame, max_guesses: int = 6, guess: str = None) -> Tuple[List[str], List[Tuple[int, ...]], List[int]]:
+    def solve_wordle(self, game: WordleGame, max_guesses: int = MAX_GUESSES, guess: str = None) -> Tuple[List[str], List[Tuple[int, ...]], List[int]]:
         """
         Solves the Wordle game by iteratively making guesses.
         Returns a tuple: (list of guesses, list of feedback tuples, list of candidate counts after each guess).
@@ -334,57 +336,97 @@ class WordleSolver:
 # SolutionTester Class
 # =============================================================================
 class SolutionTester:
-    """Tests the WordleSolver against all target words and updates the dashboard."""
+    """Tests the WordleSolver against all target words and tracks statistics."""
 
-    def __init__(self, all_candidates: set[str], all_words: set[str], dashboard: Dashboard, version: str) -> None:
+    def __init__(self, all_candidates: set[str], all_words: set[str], dashboard, version: str, visualize: bool = False):
         self.dashboard = dashboard
         self.all_candidates = all_candidates  # Target words
         self.all_words = all_words            # Allowed guesses
-        self.distribution: List[int] = [0] * 6
+        self.distribution: List[int] = [0] * MAX_GUESSES
         self.version = version
+        self.visualize = visualize
+
+        # Track remaining candidate counts per guess
+        self.remaining_counts_per_game = []
 
     @contextmanager
-    def hidden_cursor(self) -> Generator[None, None, None]:
+    def hidden_cursor(self):
         """Hides the terminal cursor during testing."""
-        sys.stdout.write("\033[?25l")
-        sys.stdout.flush()
+        print("\033[?25l", end="")  # Hide cursor
         try:
             yield
         finally:
-            sys.stdout.write("\033[?25h")
-            sys.stdout.flush()
+            print("\033[?25h", end="")  # Show cursor
 
-    def test_solver(self, initial_guess: str = None) -> None:
-        """Tests the solver on all target words."""
+    def test_solver(self, initial_guess: str = None):
+        """Tests the solver on all target words and optionally visualizes results."""
         self.start_time = time.perf_counter()
         with self.hidden_cursor():
             for target in self.all_candidates:
                 self.test_target(target, initial_guess)
+
         elapsed = time.perf_counter() - self.start_time
         print(f"\n{len(self.all_candidates)} games played, {elapsed:.2f}s elapsed.")
 
-    def test_target(self, target: str, initial_guess: str = None) -> None:
+        if self.visualize:
+            self.plot_results()
+
+    def test_target(self, target: str, initial_guess: str = None):
         """
         Tests the solver on a single target word.
         Updates the distribution of guesses and the dashboard.
         """
         solver = WordleSolver(self.all_candidates, self.all_words, version=self.version)
         game = WordleGame(target)
-        guesses, feedbacks, remaining = solver.solve_wordle(game, guess=initial_guess)
+        guesses, feedbacks, remaining_candidates = solver.solve_wordle(game, guess=initial_guess)
+
         self.distribution[len(guesses) - 1] += 1
+        self.remaining_counts_per_game.append(remaining_candidates)
 
         # Ensure remaining list has at least one element for dashboard formatting.
-        dashboard_remaining = remaining + [0]  
+        dashboard_remaining = remaining_candidates + [0]  
         self.dashboard.draw_dashboard(str(solver), target, guesses, feedbacks,
                                       self.distribution, dashboard_remaining,
                                       len(self.all_candidates), self.start_time)
 
+# =============================================================================
+# Output Functions
+# =============================================================================
+def plot_results(remaining_counts_per_game: List[List[int]], distribution: List[int]):
+    """Plot Wordle solver performance metrics using Matplotlib."""
+    
+    # Determine the maximum number of guesses taken in any game
+    max_guesses = max(len(game_counts) for game_counts in remaining_counts_per_game)
+    
+    # Compute the average remaining candidates at each guess
+    avg_remaining_candidates = []
+    for guess_num in range(max_guesses):
+        guess_counts = [game_counts[guess_num] for game_counts in remaining_counts_per_game if len(game_counts) > guess_num]
+        avg_remaining_candidates.append(np.mean(guess_counts) if guess_counts else 0)
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+
+    # Histogram: Distribution of guesses needed
+    axs[0].bar(range(1, MAX_GUESSES + 1), distribution, color="skyblue", edgecolor="black")
+    axs[0].set_title("Wordle Guess Distribution")
+    axs[0].set_xlabel("Number of Guesses")
+    axs[0].set_ylabel("Frequency")
+
+    # Line chart: Average remaining candidates per guess
+    axs[1].plot(range(1, len(avg_remaining_candidates) + 1), avg_remaining_candidates, marker='o', linestyle='-', color="red")
+    axs[1].set_title("Average Remaining Candidates per Guess")
+    axs[1].set_xlabel("Guess Number")
+    axs[1].set_ylabel("Average Candidates Remaining")
+    axs[1].set_yscale("log")  # Log scale for better visualization
+
+    plt.tight_layout()
+    plt.show()
 
 # =============================================================================
 # Simulation Functions
 # =============================================================================
 def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, 
-             version: str = "frequency", initial_guess: str = INITIAL_GUESS) -> None:
+             version: str = "frequency", initial_guess: str = INITIAL_GUESS, visualise: bool = False) -> None:
     """Loads words from files and runs the simulation."""
     if initial_guess is not None and len(initial_guess) != WLEN:
         initial_guess = None
@@ -400,6 +442,9 @@ def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = W
     dashboard = Dashboard()
     tester = SolutionTester(all_candidates, all_words, dashboard, version=version)
     tester.test_solver(initial_guess)
+
+    if visualise:
+        plot_results(tester.remaining_counts_per_game, tester.distribution)
 
 def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, version: str = "frequency") -> None:
     """Loads words from files and runs solver on a single target word."""
