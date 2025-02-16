@@ -19,9 +19,9 @@ import numpy as np
 from typing import List, Set, Dict, Tuple, Any
 from functools import lru_cache
 
-# ----------------------
+# =============================================================================
 # Constants & Colour Map
-# ----------------------
+# =============================================================================
 WORDS = 4        # number of words per cluster (a guess)
 CLUSTERS = 4     # total clusters in the puzzle (16 words total)
 MISS = 0         # guess has ≤2 words correct
@@ -35,10 +35,9 @@ COLOURS = {
     2: "🟦",  # Level 2 = Blue
     3: "🟪"   # Level 3 = Purple
 }
-
-# -------------------------------------------
+# =============================================================================
 # JSON Loading & Game/Mapping Helper Functions
-# -------------------------------------------
+# =============================================================================
 def load_games(filename: str) -> List[Dict[str, Any]]:
     """Load the JSON file containing games."""
     with open(filename, 'r') as f:
@@ -69,9 +68,9 @@ def build_word_level_mapping(game: Dict[str, Any]) -> Dict[str, int]:
             
     return mapping
 
-# ---------------------------
+# =============================================================================
 # Game & Solver Class Definitions
-# ---------------------------
+# =============================================================================
 class ConnectionsGame:
     def __init__(self, solution: List[Set[str]], all_words: Set[str]):
         self.solution = solution
@@ -264,9 +263,9 @@ class ConnectionsSolver:
 
         return solved_clusters
 
-# ---------------------------
+# =============================================================================
 # Final Summary Output Function
-# ---------------------------
+# =============================================================================
 def print_final_summary(game_id: int, guess_history: List[List[str]], word_to_level: Dict[str, int]):
     """
     Print a summary of all guess attempts.
@@ -281,27 +280,88 @@ def print_final_summary(game_id: int, guess_history: List[List[str]], word_to_le
         row = "".join([COLOURS[word_to_level[word]] for word in guess])
         print(row)
 
-    print(f"\nTotal guesses: {len(guess_history)}")
+    print(f"\nTotal mistakes: {len(guess_history) - CLUSTERS}")
 
-# ---------------------------
-# Main Execution
-# ---------------------------
-if __name__ == "__main__":
-    # Load games from the JSON file.
-    games = load_games(ANSWERS_FILE)
-    random_game = pick_random_game(games)
-    game_id = random_game["id"]
-    solution = extract_solution(random_game)
+# =============================================================================
+# Simulation Functions
+# =============================================================================
+def simulate(filename: str = "answers.json", game_id: int = None) -> None:
+    games = load_games(filename)
+
+    # Select game by ID or randomly
+    if game_id is not None:
+        selected_game = next((game for game in games if game["id"] == game_id), None)
+    else:
+        selected_game = pick_random_game(games)
+
+    game_id = selected_game["id"]
+
+    # Extract solution and words
+    solution = extract_solution(selected_game)
     all_words = {word for cluster in solution for word in cluster}
-    word_to_level = build_word_level_mapping(random_game)
+    word_to_level = build_word_level_mapping(selected_game)
 
-    # Create the game and solver objects.
+    # Initialise game & solver
     game = ConnectionsGame(solution, all_words)
     solver = ConnectionsSolver()
 
-    # Solve the game (one cluster at a time). All guess attempts are stored in solver.guess_history.
-    solver.solve_game(game)
+    solution = solver.solve_game(game)
 
-    # Print the final summary.
-    print("\n")
+    # Show final results
+    print("\nPuzzle Solved\n")
+    print(f"Solution: {solution}")
     print_final_summary(game_id, solver.guess_history, word_to_level)
+
+def manual(filename: str = "answers.json", game_id: int = None) -> None:
+    games = load_games(filename)
+
+    # Select game by ID or randomly
+    if game_id is not None:
+        selected_game = next((game for game in games if game["id"] == game_id), None)
+    else:
+        selected_game = pick_random_game(games)
+
+    game_id = selected_game["id"]
+
+    # Extract solution and words
+    solution = extract_solution(selected_game)
+    all_words = {word for cluster in solution for word in cluster}
+    word_to_level = build_word_level_mapping(selected_game)
+
+    # Initialise game & solver
+    game = ConnectionsGame(solution, all_words)
+    solver = ConnectionsSolver()
+
+    while game.all_words:
+        # Show remaining words
+        print("\nRemaining words:", ", ".join(game.all_words))
+        
+        # Get guess
+        guess = input("\nEnter guess: ").upper().strip().split(",")
+        guess = [word.strip() for word in guess]
+        
+        # Validate guess
+        if not game.valid_guess(guess):
+            print("Invalid guess.")
+            continue
+
+        # Check guess
+        feedback = game.check_guess(guess)
+        solver.guess_history.append(guess)
+        
+        # Display feedback
+        print("Feedback:", "".join([COLOURS[word_to_level[word]] for word in guess]))
+
+        # If it's a HIT, remove the words from the pool
+        if feedback == 2:
+            game.all_words -= set(guess)
+
+    # Show final results
+    print("\nPuzzle Solved\n")
+    print_final_summary(game_id, solver.guess_history, word_to_level)
+
+# =============================================================================
+# Main Execution
+# =============================================================================
+if __name__ == "__main__":
+    manual()

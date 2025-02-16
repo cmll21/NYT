@@ -1,13 +1,13 @@
 import argparse
 from wordle import simulate, manual  # Import your solver functions
 
-def main():
+def main() -> None:
     """Command-line interface for Wordle Solver."""
     parser = argparse.ArgumentParser(description="Wordle Solver CLI")
     
     # Mode Selection
     parser.add_argument(
-        "--mode", choices=["simulate", "manual"], default="manual",
+        "--mode", choices=["simulate", "manual"], default="simulate",
         help="Choose between 'simulate' and 'manual'."
     )
     
