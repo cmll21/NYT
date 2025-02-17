@@ -43,7 +43,7 @@ python -m spacy download en_core_web_lg
 
 #### Simulation Mode:
 ```bash
-python wordle_solver.py --mode simulate --strategy hybrid --initial-guess crane --visualise
+python wordle_solver.py --mode simulate --strategy hybrid --initial-guess slate --visualise
 ```
 
 #### Manual Mode:
@@ -56,8 +56,8 @@ python wordle_solver.py --mode manual --strategy frequency
 - `--strategy`: frequency, entropy, or hybrid (default is hybrid).
 - `--words-file`: Path to allowed guesses file.
 - `--answers-file`: Path to answers file.
-- `--initial-guess`: Optional starting guess (5 letters).
-- `--visualise`: Enable visualization after solving.
+- `--initial-guess`: (Optional) 5 letter starting guess.
+- `--visualise`: Enable visualisation after solving.
 
 ### Connections Solver
 
