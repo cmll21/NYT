@@ -11,7 +11,6 @@ from functools import lru_cache
 from contextlib import contextmanager
 from collections import defaultdict
 from typing import List, Tuple, Dict
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -476,10 +475,14 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
             if len(feedback) == WLEN and all([c in (COLOURS.keys()) for c in feedback]):
                 break
             print("Invalid input")
+
+        if feedback == (HIT,) * WLEN:
+            break
             
         feedbacks.append(feedback)
         solver.filter_candidates(guess, feedback)
         dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.strategy())
+
 
 # =============================================================================
 # Main Execution

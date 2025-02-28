@@ -162,6 +162,7 @@ class ConnectionsSolver:
         
         return doc1.similarity(doc2)
 
+    @lru_cache(maxsize=None)
     def tfidf_similarity(self, word1: str, word2: str) -> float:
         # Create a TF-IDF vectoriser for just the two words.
         vectorizer = TfidfVectorizer()
@@ -311,11 +312,8 @@ def plot_results(guess_history: List[Tuple[List[str], int]]) -> None:
 # =============================================================================
 # Simulation Functions
 # =============================================================================
-def simulate(filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool = False) -> None:
+def select_game(filename: str = ANSWERS_FILE, game_id: int = None):
     games = load_games(filename)
-
-    # Select game by ID or randomly
-    selected_game = None
     if game_id is not None:
         selected_game = next((game for game in games if game["id"] == game_id), None)
     else:
@@ -325,6 +323,10 @@ def simulate(filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool 
         logger.error("No game found with the provided ID.")
         return
 
+    return selected_game
+
+def simulate(filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool = False) -> None:
+    selected_game = select_game(filename, game_id)
     game_id = selected_game["id"]
     solution = extract_solution(selected_game)
     all_words = {word for cluster in solution for word in cluster}
@@ -341,17 +343,7 @@ def simulate(filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool 
         plot_results(solver.guess_history)
 
 def manual(filename: str = "answers.json", game_id: int = None) -> None:
-    games = load_games(filename)
-    selected_game = None
-    if game_id is not None:
-        selected_game = next((game for game in games if game["id"] == game_id), None)
-    else:
-        selected_game = pick_random_game(games)
-
-    if not selected_game:
-        logger.error("No game found with the provided ID.")
-        return
-
+    selected_game = select_game(filename, game_id)
     game_id = selected_game["id"]
     solution = extract_solution(selected_game)
     all_words = {word for cluster in solution for word in cluster}
