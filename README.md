@@ -75,7 +75,7 @@ python connections_solver.py --mode manual --file connections/answers.json --id 
 - `--mode`: simulate or manual (default is simulate).
 - `--file`: Path to the JSON file with puzzle data.
 - `--id`: (Optional) Specific game ID to solve.
-- `--visualise`: Enable visuailsation after simulation.
+- `--visualise`: Enable visualisation after simulation.
 
 ## License
 This project is licensed under the MIT License.
