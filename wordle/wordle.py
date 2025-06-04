@@ -230,6 +230,23 @@ class WordleSolver:
         self.words.remove(best_guess)
         return best_guess
 
+    def get_best_guess(self) -> str:
+        """Return the next suggested guess without altering solver state."""
+        if self.version == "frequency":
+            return self.best_guess_frequency()
+        if self.version == "entropy":
+            return self.best_guess_entropy()
+        return self.best_guess_hybrid()
+
+    def best_guess_frequency(self) -> str:
+        """Return the frequency-based guess without modifying solver state."""
+        self.switch_list()
+        letters = "abcdefghijklmnopqrstuvwxyz"
+        freq = {letter: sum(word.count(letter) for word in self.candidates)
+                for letter in letters}
+        return max(self.words,
+                   key=lambda word: sum(freq.get(letter, 0) for letter in set(word)))
+
     def select_guess_entropy(self) -> str:
         """
         Chooses a guess using an entropy-based strategy.
@@ -246,6 +263,18 @@ class WordleSolver:
         self.words.remove(best_guess)
         return best_guess
 
+    def best_guess_entropy(self) -> str:
+        """Return the entropy-based guess without modifying solver state."""
+        self.switch_list()
+        max_entropy = -1.0
+        best_guess = next(iter(self.candidates))
+        for guess in self.words:
+            entropy = self.expected_information_gain(guess)
+            if entropy > max_entropy:
+                max_entropy = entropy
+                best_guess = guess
+        return best_guess
+
     def select_guess_hybrid(self) -> str:
         """
         Chooses a guess using a hybrid strategy that minimizes expected guesses.
@@ -259,6 +288,18 @@ class WordleSolver:
                 min_expected = expected
                 best_guess = guess
         self.words.remove(best_guess)
+        return best_guess
+
+    def best_guess_hybrid(self) -> str:
+        """Return the hybrid strategy guess without modifying solver state."""
+        self.switch_list()
+        min_expected = float("inf")
+        best_guess = next(iter(self.candidates))
+        for guess in self.words:
+            expected = self.expected_guesses(guess)
+            if expected < min_expected:
+                min_expected = expected
+                best_guess = guess
         return best_guess
 
     def expected_information_gain(self, guess: str) -> float:
@@ -457,7 +498,7 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
     
     guess, feedbacks, feedback = "", [], ()
     
-    dashboard.draw_dashboard(version=str(solver), feedbacks=feedbacks, best_guess=solver.strategy())
+    dashboard.draw_dashboard(version=str(solver), feedbacks=feedbacks, best_guess=solver.get_best_guess())
 
     while feedback != (HIT,) * WLEN:
         guess, feedback = "", []
@@ -481,7 +522,7 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
             
         feedbacks.append(feedback)
         solver.filter_candidates(guess, feedback)
-        dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.strategy())
+        dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.get_best_guess())
 
 
 # =============================================================================
