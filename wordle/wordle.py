@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 INITIAL_GUESS: str = None
 WLEN: int = 5
 MAX_GUESSES: int = 6
-MISS, CLOSE, HIT = np.uint8(0), np.uint8(1), np.uint8(2)
+MISS, CLOSE, HIT = 0, 1, 2
 COLOURS: Dict[int, str] = {
     MISS: "⬜", 
     CLOSE: "🟨", 
@@ -261,6 +261,19 @@ class WordleSolver:
         self.words.remove(best_guess)
         return best_guess
 
+    def preview_next_guess(self) -> str:
+        """
+        Returns the next recommended guess without permanently removing it
+        from the available guess pool.
+        """
+        try:
+            suggestion = self.strategy()
+        except (ValueError, StopIteration):
+            return ""
+
+        self.words.add(suggestion)
+        return suggestion
+
     def expected_information_gain(self, guess: str) -> float:
         """
         Calculates the expected information gain from a guess.
@@ -284,9 +297,14 @@ class WordleSolver:
         Estimates the expected number of guesses remaining if the given guess is made.
         """
 
+        total_candidates = len(self.candidates)
+        if total_candidates <= 1:
+            return 0.0
+
         p = self.probability_of_guess(guess)
-        current_uncertainty = np.log2(1 / len(self.candidates))
-        expected = (1 - p) * self.entropy_to_guesses(current_uncertainty - self.expected_information_gain(guess))
+        current_uncertainty = np.log2(total_candidates)
+        remaining_entropy = max(current_uncertainty - self.expected_information_gain(guess), 0.0)
+        expected = (1 - p) * self.entropy_to_guesses(remaining_entropy)
         return expected
 
     def probability_of_guess(self, guess: str) -> float:
@@ -308,6 +326,8 @@ class WordleSolver:
         # Use the provided initial guess or select one using the chosen strategy.
         if guess is None:
             guess = self.strategy()
+        else:
+            self.words.discard(guess)
 
         for _ in range(max_guesses):
             guesses.append(guess)
@@ -365,7 +385,7 @@ class SolutionTester:
         print(f"\n{len(self.all_candidates)} games played, {elapsed:.2f}s elapsed.")
 
         if self.visualize:
-            self.plot_results()
+            plot_results(self.remaining_counts_per_game, self.distribution)
 
     def test_target(self, target: str, initial_guess: str = None):
         """
@@ -444,7 +464,7 @@ def simulate(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = W
 
 def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WORDS_FILE, version: str = "frequency") -> None:
     """Loads words from files and runs solver on a single target word."""
-     # Load and filter target words (one word per line with the correct length)
+    # Load and filter target words (one word per line with the correct length)
     with open(all_candidates_file, "r") as f:
         all_candidates = {line.strip().lower() for line in f if len(line.strip()) == WLEN}
 
@@ -457,7 +477,7 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
     
     guess, feedbacks, feedback = "", [], ()
     
-    dashboard.draw_dashboard(version=str(solver), feedbacks=feedbacks, best_guess=solver.strategy())
+    dashboard.draw_dashboard(version=str(solver), feedbacks=feedbacks, best_guess=solver.preview_next_guess())
 
     while feedback != (HIT,) * WLEN:
         guess, feedback = "", []
@@ -480,8 +500,9 @@ def manual(all_candidates_file: str = CANDIDATES_FILE, all_words_file: str = WOR
             break
             
         feedbacks.append(feedback)
+        solver.words.discard(guess)
         solver.filter_candidates(guess, feedback)
-        dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.strategy())
+        dashboard.draw_dashboard(feedbacks=feedbacks, best_guess=solver.preview_next_guess())
 
 
 # =============================================================================
