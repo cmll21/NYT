@@ -18,8 +18,7 @@ from sklearn.preprocessing import normalize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-from typing import List, Set, Dict, Tuple, Any, Deque
-from functools import lru_cache
+from functools import cache
 import matplotlib.pyplot as plt
 from collections import deque
 
@@ -33,24 +32,25 @@ logging.disable(logging.CRITICAL)  # Disable logging
 # =============================================================================
 # Constants & Colour Map
 # =============================================================================
-WORDS = 4        # Number of words per cluster (a guess)
-CLUSTERS = 4     # Total clusters in the puzzle (16 words total)
-MISS = 0       # ≤2 words correct
-CLOSE = 1      # Exactly 3 words correct
-HIT = 2        # Exact match to a solution cluster
+WORDS = 4  # Number of words per cluster (a guess)
+CLUSTERS = 4  # Total clusters in the puzzle (16 words total)
+MISS = 0  # ≤2 words correct
+CLOSE = 1  # Exactly 3 words correct
+HIT = 2  # Exact match to a solution cluster
 ANSWERS_FILE = "connections/answers.json"
 
 COLOURS = {
     0: "🟨",  # Level 0 = Yellow
     1: "🟩",  # Level 1 = Green
     2: "🟦",  # Level 2 = Blue
-    3: "🟪"   # Level 3 = Purple
+    3: "🟪",  # Level 3 = Purple
 }
+
 
 # =============================================================================
 # JSON Loading & Helper Functions
 # =============================================================================
-def load_games(filename: str) -> List[Dict[str, Any]]:
+def load_games(filename: str) -> list[dict[str, object]]:
     """Load the JSON file containing games."""
     try:
         with open(filename, "r") as f:
@@ -60,15 +60,18 @@ def load_games(filename: str) -> List[Dict[str, Any]]:
         logger.error(f"Error loading file {filename}: {e}")
         raise
 
-def pick_random_game(games: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+def pick_random_game(games: list[dict[str, object]]) -> dict[str, object]:
     """Randomly select one game from the list."""
     return random.choice(games)
 
-def extract_solution(game: Dict[str, Any]) -> List[Set[str]]:
+
+def extract_solution(game: dict[str, object]) -> list[set[str]]:
     """Extract the solution groups from the game."""
     return [set(answer["members"]) for answer in game["answers"]]
 
-def build_word_level_mapping(game: Dict[str, Any]) -> Dict[str, int]:
+
+def build_word_level_mapping(game: dict[str, object]) -> dict[str, int]:
     """Build a dictionary mapping each word to its level."""
     mapping = {}
     for answer in game["answers"]:
@@ -77,19 +80,20 @@ def build_word_level_mapping(game: Dict[str, Any]) -> Dict[str, int]:
             mapping[word] = level
     return mapping
 
+
 # =============================================================================
 # Game & Solver Class Definitions
 # =============================================================================
 class ConnectionsGame:
-    def __init__(self, solution: List[Set[str]], all_words: Set[str]) -> None:
+    def __init__(self, solution: list[set[str]], all_words: set[str]) -> None:
         self.solution = solution
         self.all_words = all_words  # Pool of all words
 
-    def valid_guess(self, guess: List[str]) -> bool:
+    def valid_guess(self, guess: list[str]) -> bool:
         """A guess must be 4 words and a subset of the overall word pool."""
         return set(guess).issubset(self.all_words) and len(guess) == WORDS
 
-    def check_guess(self, guess: List[str]) -> int:
+    def check_guess(self, guess: list[str]) -> int:
         """
         Check a candidate guess against the solution groups.
         Returns:
@@ -100,23 +104,33 @@ class ConnectionsGame:
         guess_set = set(guess)
         if guess_set in self.solution:
             return HIT
-        if any(len(guess_set.symmetric_difference(cluster)) == 2 for cluster in self.solution):
+        if any(
+            len(guess_set.symmetric_difference(cluster)) == 2
+            for cluster in self.solution
+        ):
             return CLOSE
         return MISS
+
 
 class ConnectionsSolver:
     def __init__(self) -> None:
         self.nlp = spacy.load("en_core_web_lg")
-        self.guess_history: List[Tuple[List[str], int]] = []
-        self.locked_words: Deque[str] = deque(maxlen=3)  # Up to 3 locked words (in order)
-        self.tried_words_per_cluster: Dict[str, Set[str]] = {}  # Tracks tried words per cluster
+        self.guess_history: list[tuple[list[str], int]] = []
+        self.locked_words: deque[str] = deque(
+            maxlen=3
+        )  # Up to 3 locked words (in order)
+        self.tried_words_per_cluster: dict[
+            str, set[str]
+        ] = {}  # Tracks tried words per cluster
         self.reached_close = False  # Tracks if a CLOSE guess was hit
         self.feedback = MISS  # Most recent feedback
 
-    def get_spacy_vectors(self, words: List[str]) -> np.ndarray:
+    def get_spacy_vectors(self, words: list[str]) -> np.ndarray:
         return np.array([self.nlp(word).vector for word in words])
 
-    def cluster_words(self, words: List[str], n_clusters: int) -> List[Tuple[int, List[str], float]]:
+    def cluster_words(
+        self, words: list[str], n_clusters: int
+    ) -> list[tuple[int, list[str], float]]:
         word_vectors = normalize(self.get_spacy_vectors(words))
         kmeans = KMeans(n_clusters=n_clusters, random_state=0)
         labels = kmeans.fit_predict(word_vectors)
@@ -127,14 +141,19 @@ class ConnectionsSolver:
             clusters[label].append(words[idx])
 
         centroids = kmeans.cluster_centers_
-        distances = [np.linalg.norm(word_vectors[i] - centroids[labels[i]]) for i in range(len(words))]
+        distances = [
+            np.linalg.norm(word_vectors[i] - centroids[labels[i]])
+            for i in range(len(words))
+        ]
         cluster_confidence = {
             i: np.mean([distances[j] for j in range(len(words)) if labels[j] == i])
             for i in range(n_clusters)
         }
 
         # Sort clusters by confidence (lower average distance first)
-        sorted_clusters = sorted(clusters.items(), key=lambda item: cluster_confidence[item[0]])
+        sorted_clusters = sorted(
+            clusters.items(), key=lambda item: cluster_confidence[item[0]]
+        )
 
         # Prepare candidate clusters: first WORDS words per cluster
         new_clusters = {c: words[:WORDS] for c, words in sorted_clusters}
@@ -150,33 +169,35 @@ class ConnectionsSolver:
 
         return [(c, new_clusters[c], cluster_confidence[c]) for c in new_clusters]
 
-    @lru_cache(maxsize=None)
+    @cache
     def word_similarity(self, word1: str, word2: str) -> float:
         # Compute spaCy vectors
         doc1 = self.nlp(word1)
         doc2 = self.nlp(word2)
-        
+
         # If one of the vectors is empty, fallback to TF-IDF similarity.
         if doc1.vector_norm == 0 or doc2.vector_norm == 0:
             return self.tfidf_similarity(word1, word2)
-        
+
         return doc1.similarity(doc2)
 
-    @lru_cache(maxsize=None)
+    @cache
     def tfidf_similarity(self, word1: str, word2: str) -> float:
         # Create a TF-IDF vectoriser for just the two words.
         vectorizer = TfidfVectorizer()
         tfidf_matrix = vectorizer.fit_transform([word1, word2])
-        
+
         # Compute cosine similarity between the two TF-IDF vectors.
         sim = cosine_similarity(tfidf_matrix[0], tfidf_matrix[1])
         return sim[0][0]
 
-    def average_similarity(self, word: str, group: List[str]) -> float:
+    def average_similarity(self, word: str, group: list[str]) -> float:
         sims = [self.word_similarity(word, other) for other in group if other != word]
         return sum(sims) / len(sims) if sims else 0.0
 
-    def find_best_replacement(self, pool: Set[str], used_words: Set[str], candidate: List[str]) -> str:
+    def find_best_replacement(
+        self, pool: set[str], used_words: set[str], candidate: list[str]
+    ) -> str:
         """Return the most similar unused word from the pool."""
         unused = list(pool - used_words - set(candidate))
         if not unused:
@@ -185,7 +206,9 @@ class ConnectionsSolver:
         unused.sort(key=lambda w: self.average_similarity(w, candidate), reverse=True)
         return unused[0]
 
-    def modify_candidate(self, candidate: List[str], pool: Set[str], cluster_id: str) -> List[str]:
+    def modify_candidate(
+        self, candidate: list[str], pool: set[str], cluster_id: str
+    ) -> list[str]:
         """
         Modify the candidate guess while preserving locked words.
         Replaces the least fitting non-locked word with a new candidate.
@@ -198,23 +221,32 @@ class ConnectionsSolver:
                 if len(candidate_copy) < WORDS:
                     candidate_copy.append(word)
                 else:
-                    non_locked = [w for w in candidate_copy if w not in self.locked_words]
+                    non_locked = [
+                        w for w in candidate_copy if w not in self.locked_words
+                    ]
                     if non_locked:
-                        worst = min(non_locked, key=lambda w: self.average_similarity(w, candidate_copy))
+                        worst = min(
+                            non_locked,
+                            key=lambda w: self.average_similarity(w, candidate_copy),
+                        )
                         candidate_copy.remove(worst)
                         candidate_copy.append(word)
 
         # Replace one of the non-locked words
         non_locked = [w for w in candidate_copy if w not in self.locked_words]
         if non_locked:
-            worst = min(non_locked, key=lambda w: self.average_similarity(w, candidate_copy))
+            worst = min(
+                non_locked, key=lambda w: self.average_similarity(w, candidate_copy)
+            )
             candidate_copy.remove(worst)
             if self.reached_close:
                 self.locked_words.append(worst)
             elif self.feedback == MISS and len(non_locked) > 1:
                 # Optionally remove another low-similarity word if still in MISS mode
-                next_worst = min([w for w in non_locked if w != worst],
-                                 key=lambda w: self.average_similarity(w, candidate_copy))
+                next_worst = min(
+                    [w for w in non_locked if w != worst],
+                    key=lambda w: self.average_similarity(w, candidate_copy),
+                )
                 candidate_copy.remove(next_worst)
 
         # Track tried words for this cluster
@@ -223,13 +255,15 @@ class ConnectionsSolver:
 
         # Refill candidate until it has WORDS items
         while len(candidate_copy) < WORDS:
-            new_word = self.find_best_replacement(pool, self.tried_words_per_cluster[cluster_id], candidate_copy)
+            new_word = self.find_best_replacement(
+                pool, self.tried_words_per_cluster[cluster_id], candidate_copy
+            )
             candidate_copy.append(new_word)
             self.tried_words_per_cluster[cluster_id].add(new_word)
 
         return candidate_copy
 
-    def solve_cluster(self, game: ConnectionsGame, cluster_id: str) -> List[str]:
+    def solve_cluster(self, game: ConnectionsGame, cluster_id: str) -> list[str]:
         pool = set(game.all_words)
         tried = set()
 
@@ -247,7 +281,9 @@ class ConnectionsSolver:
             tried.add(candidate_tuple)
             self.feedback = game.check_guess(candidate)
             self.guess_history.append((candidate.copy(), self.feedback))
-            logger.info(f"Guess: {candidate} | Feedback: {self.feedback} | Locked: {list(self.locked_words)}")
+            logger.info(
+                f"Guess: {candidate} | Feedback: {self.feedback} | Locked: {list(self.locked_words)}"
+            )
 
             if self.feedback == CLOSE and not self.reached_close:
                 logger.info("Reached CLOSE!")
@@ -266,7 +302,7 @@ class ConnectionsSolver:
             else:
                 candidate = self.modify_candidate(candidate, pool, cluster_id)
 
-    def solve_game(self, game: ConnectionsGame) -> List[List[str]]:
+    def solve_game(self, game: ConnectionsGame) -> list[list[str]]:
         solved_clusters = []
         cluster_ids = list(range(CLUSTERS))
         while game.all_words:
@@ -275,10 +311,15 @@ class ConnectionsSolver:
             game.all_words -= set(solved)
         return solved_clusters
 
+
 # =============================================================================
 # Output Functions
 # =============================================================================
-def print_final_summary(game_id: int, guess_history: List[Tuple[List[str], int]], word_to_level: Dict[str, int]) -> None:
+def print_final_summary(
+    game_id: int,
+    guess_history: list[tuple[list[str], int]],
+    word_to_level: dict[str, int],
+) -> None:
     """Print summary of all guess attempts using coloured squares."""
     print("Connections")
     print(f"Puzzle #{game_id}")
@@ -287,7 +328,8 @@ def print_final_summary(game_id: int, guess_history: List[Tuple[List[str], int]]
         print(row)
     print(f"\nTotal mistakes: {len(guess_history) - CLUSTERS}")
 
-def plot_results(guess_history: List[Tuple[List[str], int]]) -> None:
+
+def plot_results(guess_history: list[tuple[list[str], int]]) -> None:
     """Plot solver results using Matplotlib."""
     cluster_counts = [sum(1 for _, fb in guess_history if fb == i) for i in range(3)]
     labels = ["Misses (0)", "Close (1)", "Correct (2)"]
@@ -295,7 +337,9 @@ def plot_results(guess_history: List[Tuple[List[str], int]]) -> None:
 
     plt.figure(figsize=(10, 4))
     plt.subplot(1, 2, 1)
-    plt.pie(cluster_counts, labels=labels, autopct="%1.1f%%", colors=colors, startangle=140)
+    plt.pie(
+        cluster_counts, labels=labels, autopct="%1.1f%%", colors=colors, startangle=140
+    )
     plt.title("Connections Guess Distribution")
 
     plt.subplot(1, 2, 2)
@@ -308,6 +352,7 @@ def plot_results(guess_history: List[Tuple[List[str], int]]) -> None:
 
     plt.tight_layout()
     plt.show()
+
 
 # =============================================================================
 # Simulation Functions
@@ -325,7 +370,10 @@ def select_game(filename: str = ANSWERS_FILE, game_id: int = None):
 
     return selected_game
 
-def simulate(filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool = False) -> None:
+
+def simulate(
+    filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool = False
+) -> None:
     selected_game = select_game(filename, game_id)
     game_id = selected_game["id"]
     solution = extract_solution(selected_game)
@@ -341,6 +389,7 @@ def simulate(filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool 
     print_final_summary(game_id, solver.guess_history, word_to_level)
     if visualise:
         plot_results(solver.guess_history)
+
 
 def manual(filename: str = "answers.json", game_id: int = None) -> None:
     selected_game = select_game(filename, game_id)
@@ -369,11 +418,13 @@ def manual(filename: str = "answers.json", game_id: int = None) -> None:
     print("\nPuzzle Solved")
     print_final_summary(game_id, solver.guess_history, word_to_level)
 
+
 # =============================================================================
 # Main Execution
 # =============================================================================
 def main() -> None:
     simulate()
+
 
 if __name__ == "__main__":
     main()

@@ -4,13 +4,10 @@ Strands Solver
 """
 
 from nltk.corpus import words
-from typing import List, Tuple
 
 MAX_WLEN = 10
 
-DIRECTIONS = [(-1, -1), (-1, 0), (-1, 1),
-              (0, -1), (0, 1),
-              (1, -1), (1, 0), (1, 1)]
+DIRECTIONS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
 # BOARD = [
 #     ['T', 'E', 'N', 'H', 'C', 'N'],
@@ -24,9 +21,9 @@ DIRECTIONS = [(-1, -1), (-1, 0), (-1, 1),
 # ]
 
 BOARD = [
-    ['B', 'A', 'D'],
-    ['C', 'Y', 'O'],
-    ['A', 'T', 'G'],
+    ["B", "A", "D"],
+    ["C", "Y", "O"],
+    ["A", "T", "G"],
 ]
 
 
@@ -50,13 +47,17 @@ class Trie:
 
 
 class Path:
-    def __init__(self, cells: List[Tuple[int, int]]) -> None:
+    def __init__(self, cells: list[tuple[int, int]]) -> None:
         self.cells = cells
         self.word = "".join([BOARD[i][j] for i, j in cells])
 
     def is_spangram(self) -> bool:
-        lr = any([c[0] == 0 for c in self.cells]) and any([c[0] == len(BOARD) - 1 for c in self.cells])
-        ud = any([c[1] == 0 for c in self.cells]) and any([c[1] == len(BOARD[0]) - 1 for c in self.cells])
+        lr = any([c[0] == 0 for c in self.cells]) and any(
+            [c[0] == len(BOARD) - 1 for c in self.cells]
+        )
+        ud = any([c[1] == 0 for c in self.cells]) and any(
+            [c[1] == len(BOARD[0]) - 1 for c in self.cells]
+        )
         return lr or ud
 
     def __repr__(self) -> str:
@@ -73,7 +74,7 @@ class Path:
 
 
 class StrandsGame:
-    def __init__(self, board: List[List[str]]) -> None:
+    def __init__(self, board: list[list[str]]) -> None:
         self.board = board
         self.rows = len(board)
         self.cols = len(board[0])
@@ -90,7 +91,15 @@ class StrandsSolver:
                 self.trie.insert(word)
         self.found_paths = []
 
-    def dfs(self, i: int, j: int, current_cells: List[Tuple[int, int]], visited, prefix: str, node: TrieNode) -> None:
+    def dfs(
+        self,
+        i: int,
+        j: int,
+        current_cells: list[tuple[int, int]],
+        visited,
+        prefix: str,
+        node: TrieNode,
+    ) -> None:
         letter = self.game.board[i][j].lower()
         if letter not in node.children:
             return  # No word in the dictionary starts with this prefix.
@@ -111,11 +120,15 @@ class StrandsSolver:
         # Explore all 8 adjacent directions.
         for di, dj in DIRECTIONS:
             ni, nj = i + di, j + dj
-            if 0 <= ni < self.game.rows and 0 <= nj < self.game.cols and (ni, nj) not in visited:
+            if (
+                0 <= ni < self.game.rows
+                and 0 <= nj < self.game.cols
+                and (ni, nj) not in visited
+            ):
                 new_cells = current_cells + [(ni, nj)]
                 self.dfs(ni, nj, new_cells, visited | {(ni, nj)}, prefix, node)
 
-    def find_words(self) -> Tuple[List[Path], List[Path]]:
+    def find_words(self) -> tuple[list[Path], list[Path]]:
         self.found_paths = []
         # Start DFS from each cell using the trie's root.
         for i in range(self.game.rows):
@@ -128,11 +141,9 @@ class StrandsSolver:
         print(f"Found {len(self.found_paths)} words, {len(spangrams)} are spangrams")
         return self.found_paths, spangrams
 
-    def find_solution(self) -> List[Path]:
+    def find_solution(self) -> list[Path]:
         # Implement using bitmasking and backtracking to find solution
         ...
-
-
 
 
 def main():
