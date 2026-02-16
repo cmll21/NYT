@@ -33,10 +33,10 @@ def main() -> None:
         help="Specify an initial guess (default: None)."
     )
 
-    # Visualisation
+    # Visualization
     parser.add_argument(
-        "--visualise", action="store_true",
-        help="Show visualisations after solving"
+        "--visualize", action="store_true",
+        help="Show visualizations after solving"
     )
 
     args = parser.parse_args()
@@ -44,7 +44,7 @@ def main() -> None:
     # Run the selected mode
     if args.mode == "simulate":
         simulate(all_candidates_file=args.answers_file, all_words_file=args.words_file, 
-                 version=args.strategy, initial_guess = args.initial_guess, visualise = args.visualise)
+                 version=args.strategy, initial_guess = args.initial_guess, visualize = args.visualize)
     elif args.mode == "manual":
         manual(all_candidates_file=args.answers_file, all_words_file=args.words_file, version=args.strategy)
 

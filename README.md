@@ -1,6 +1,6 @@
 # NYT Puzzle Solvers
 
-This repository contains solvers for two New York Times puzzles: **Wordle** and **Connections**.
+This repository contains solvers for four New York Times puzzles: **Wordle**, **Connections**, **Spelling Bee**, and **Strands**.
 
 ## Wordle Solver
 
@@ -12,8 +12,8 @@ This repository contains solvers for two New York Times puzzles: **Wordle** and 
 - **Files:**
   - `wordle/allowed-guesses.txt` – Allowed guess words.
   - `wordle/answers-alphabetical.txt` – Valid answer words.
-  - `wordle.py` – Main Wordle solver logic.
-  - `cli.py` - Main command line interface script.
+  - `wordle/wordle.py` – Main Wordle solver logic.
+  - `wordle/cli.py` - Main command line interface script.
 
 ## Connections Solver
 
@@ -24,13 +24,13 @@ This repository contains solvers for two New York Times puzzles: **Wordle** and 
 - **Visualisation:** Optional plots to display feedback and progress.
 - **Files:**
   - `connections/answers.json` – JSON file with puzzle data.
-  - `connections_solver.py` – Main Connections solver script.
-  - `cli.py` - Main command line interface script.
+  - `connections/connections.py` – Main Connections solver script.
+  - `connections/cli.py` - Main command line interface script.
 
 ## Requirements
 
 - Python 3.7 or later.
-- Packages: `argparse`, `numpy`, `pandas`, `matplotlib`, `spacy`, `scikit-learn`.
+- Packages: `argparse`, `numpy`, `matplotlib`, `spacy`, `scikit-learn`, `nltk`.
 
 For the Connections solver, download the SpaCy model:
 ```bash
@@ -43,12 +43,12 @@ python -m spacy download en_core_web_lg
 
 #### Simulation Mode:
 ```bash
-python wordle_solver.py --mode simulate --strategy hybrid --initial-guess slate --visualise
+python3 wordle/cli.py --mode simulate --strategy hybrid --initial-guess slate --visualize
 ```
 
 #### Manual Mode:
 ```bash
-python wordle_solver.py --mode manual --strategy frequency
+python3 wordle/cli.py --mode manual --strategy frequency
 ```
 
 #### Arguments:
@@ -57,25 +57,25 @@ python wordle_solver.py --mode manual --strategy frequency
 - `--words-file`: Path to allowed guesses file.
 - `--answers-file`: Path to answers file.
 - `--initial-guess`: (Optional) 5 letter starting guess.
-- `--visualise`: Enable visualisation after solving.
+- `--visualize`: Enable visualization after solving.
 
 ### Connections Solver
 
 #### Simulation Mode:
 ```bash
-python connections_solver.py --mode simulate --file connections/answers.json --id 1 --visualise
+python3 connections/cli.py --mode simulate --file connections/answers.json --id 1 --visualize
 ```
 
 #### Manual Mode:
 ```bash
-python connections_solver.py --mode manual --file connections/answers.json --id 1
+python3 connections/cli.py --mode manual --file connections/answers.json --id 1
 ```
 
 #### Arguments:
 - `--mode`: simulate or manual (default is simulate).
 - `--file`: Path to the JSON file with puzzle data.
 - `--id`: (Optional) Specific game ID to solve.
-- `--visualise`: Enable visualisation after simulation.
+- `--visualize`: Enable visualization after simulation.
 
 ## License
 This project is licensed under the MIT License.

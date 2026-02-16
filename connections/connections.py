@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 logging.disable(logging.CRITICAL)  # Disable logging
 
 # =============================================================================
-# Constants & Colour Map
+# Constants & Color Map
 # =============================================================================
 WORDS = 4  # Number of words per cluster (a guess)
 CLUSTERS = 4  # Total clusters in the puzzle (16 words total)
@@ -39,11 +39,16 @@ CLOSE = 1  # Exactly 3 words correct
 HIT = 2  # Exact match to a solution cluster
 ANSWERS_FILE = "connections/answers.json"
 
-COLOURS = {
+COLORS = {
     0: "🟨",  # Level 0 = Yellow
     1: "🟩",  # Level 1 = Green
     2: "🟦",  # Level 2 = Blue
     3: "🟪",  # Level 3 = Purple
+}
+FEEDBACK_LABELS = {
+    MISS: "MISS",
+    CLOSE: "CLOSE",
+    HIT: "HIT",
 }
 
 
@@ -320,11 +325,11 @@ def print_final_summary(
     guess_history: list[tuple[list[str], int]],
     word_to_level: dict[str, int],
 ) -> None:
-    """Print summary of all guess attempts using coloured squares."""
+    """Print summary of all guess attempts using colored squares."""
     print("Connections")
     print(f"Puzzle #{game_id}")
     for guess, _ in guess_history:
-        row = "".join([COLOURS[word_to_level[word]] for word in guess])
+        row = "".join([COLORS[word_to_level[word]] for word in guess])
         print(row)
     print(f"\nTotal mistakes: {len(guess_history) - CLUSTERS}")
 
@@ -372,9 +377,12 @@ def select_game(filename: str = ANSWERS_FILE, game_id: int = None):
 
 
 def simulate(
-    filename: str = ANSWERS_FILE, game_id: int = None, visualise: bool = False
+    filename: str = ANSWERS_FILE, game_id: int = None, visualize: bool = False
 ) -> None:
     selected_game = select_game(filename, game_id)
+    if selected_game is None:
+        return
+
     game_id = selected_game["id"]
     solution = extract_solution(selected_game)
     all_words = {word for cluster in solution for word in cluster}
@@ -387,12 +395,15 @@ def simulate(
     print("\nPuzzle Solved")
     print(f"Solution: {solution_clusters}")
     print_final_summary(game_id, solver.guess_history, word_to_level)
-    if visualise:
+    if visualize:
         plot_results(solver.guess_history)
 
 
-def manual(filename: str = "answers.json", game_id: int = None) -> None:
+def manual(filename: str = ANSWERS_FILE, game_id: int = None) -> None:
     selected_game = select_game(filename, game_id)
+    if selected_game is None:
+        return
+
     game_id = selected_game["id"]
     solution = extract_solution(selected_game)
     all_words = {word for cluster in solution for word in cluster}
@@ -411,7 +422,7 @@ def manual(filename: str = "answers.json", game_id: int = None) -> None:
 
         feedback = game.check_guess(guess)
         solver.guess_history.append((guess, feedback))
-        print("Feedback:", "".join([COLOURS[word_to_level[word]] for word in guess]))
+        print(f"Feedback: {FEEDBACK_LABELS[feedback]}")
         if feedback == HIT:
             game.all_words -= set(guess)
 

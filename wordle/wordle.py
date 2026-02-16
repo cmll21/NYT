@@ -18,7 +18,7 @@ INITIAL_GUESS: str | None = None
 WLEN: int = 5
 MAX_GUESSES: int = 6
 MISS, CLOSE, HIT = 0, 1, 2
-COLOURS: dict[int, str] = {MISS: "⬜", CLOSE: "🟨", HIT: "🟩"}
+COLORS: dict[int, str] = {MISS: "⬜", CLOSE: "🟨", HIT: "🟩"}
 CANDIDATES_FILE: str = "wordle/answers-alphabetical.txt"
 WORDS_FILE: str = "wordle/allowed-guesses.txt"
 UPDATE_FREQ: int = 1
@@ -47,12 +47,16 @@ class Dashboard:
         total: int | None = None,
         start_time: float | None = None,
         best_guess: str | None = None,
+        completed: int | None = None,
     ) -> None:
         """
         Draws the Wordle dashboard with the given simulation information.
         Only updates every UPDATE_FREQ games.
         """
-        if distribution is not None and sum(distribution) % UPDATE_FREQ != 0:
+        games_completed = (
+            completed if completed is not None else sum(distribution or [])
+        )
+        if games_completed % UPDATE_FREQ != 0:
             return
 
         # Clear screen and reposition cursor
@@ -70,11 +74,11 @@ class Dashboard:
         if remaining is not None:
             sys.stdout.write(f"Remaining: {remaining}\n")
 
-        # Display feedback rows with colours
+        # Display feedback rows with colors
         if feedbacks is not None:
             rows = 0
             for fb in feedbacks:
-                sys.stdout.write("".join(COLOURS[col] for col in fb) + "\n")
+                sys.stdout.write("".join(COLORS[col] for col in fb) + "\n")
                 rows += 1
             sys.stdout.write("\n" * (MAX_GUESSES - rows))
 
@@ -87,7 +91,7 @@ class Dashboard:
             sys.stdout.write(f"Average: {Dashboard.get_average(distribution):.2f}\n\n")
         if start_time is not None and total is not None and distribution is not None:
             Dashboard.progress_bar(
-                current=sum(distribution), total=total, start_time=start_time
+                current=games_completed, total=total, start_time=start_time
             )
 
     @staticmethod
@@ -153,7 +157,7 @@ class WordleGame:
         """
         Scores a guess against the target word.
         Returns a tuple where:
-          - 0: letter not in target (grey)
+          - 0: letter not in target (gray)
           - 1: letter in target but in a different position (yellow)
           - 2: letter in the correct position (green)
         """
@@ -326,7 +330,7 @@ class WordleSolver:
 
     def solve_wordle(
         self, game: WordleGame, max_guesses: int = MAX_GUESSES, guess: str | None = None
-    ) -> tuple[list[str], list[tuple[int, ...]], list[int]]:
+    ) -> tuple[list[str], list[tuple[int, ...]], list[int], bool]:
         """
         Solves the Wordle game by iteratively making guesses.
         Returns a tuple: (list of guesses, list of feedback tuples, list of candidate counts after each guess).
@@ -341,12 +345,14 @@ class WordleSolver:
         else:
             self.words.discard(guess)
 
+        solved = False
         for _ in range(max_guesses):
             guesses.append(guess)
             feedback = game.make_guess(guess)
             feedbacks.append(feedback)
 
             if feedback == (HIT,) * WLEN:
+                solved = True
                 break
 
             self.filter_candidates(guess, feedback)
@@ -357,7 +363,7 @@ class WordleSolver:
 
             guess = self.strategy()
 
-        return guesses, feedbacks, remaining
+        return guesses, feedbacks, remaining, solved
 
 
 # =============================================================================
@@ -378,6 +384,7 @@ class SolutionTester:
         self.all_candidates = all_candidates  # Target words
         self.all_words = all_words  # Allowed guesses
         self.distribution: list[int] = [0] * MAX_GUESSES
+        self.failures: int = 0
         self.version = version
         self.visualize = visualize
 
@@ -401,7 +408,10 @@ class SolutionTester:
                 self.test_target(target, initial_guess)
 
         elapsed = time.perf_counter() - self.start_time
-        print(f"\n{len(self.all_candidates)} games played, {elapsed:.2f}s elapsed.")
+        print(
+            f"\n{len(self.all_candidates)} games played, "
+            f"{elapsed:.2f}s elapsed, failures: {self.failures}."
+        )
 
         if self.visualize:
             plot_results(self.remaining_counts_per_game, self.distribution)
@@ -413,11 +423,14 @@ class SolutionTester:
         """
         solver = WordleSolver(self.all_candidates, self.all_words, version=self.version)
         game = WordleGame(target)
-        guesses, feedbacks, remaining_candidates = solver.solve_wordle(
+        guesses, feedbacks, remaining_candidates, solved = solver.solve_wordle(
             game, guess=initial_guess
         )
 
-        self.distribution[len(guesses) - 1] += 1
+        if solved:
+            self.distribution[len(guesses) - 1] += 1
+        else:
+            self.failures += 1
         self.remaining_counts_per_game.append(remaining_candidates)
 
         # Ensure remaining list has at least one element for dashboard formatting.
@@ -431,6 +444,7 @@ class SolutionTester:
             dashboard_remaining,
             len(self.all_candidates),
             self.start_time,
+            completed=sum(self.distribution) + self.failures,
         )
 
 
@@ -488,7 +502,7 @@ def simulate(
     all_words_file: str = WORDS_FILE,
     version: str = "frequency",
     initial_guess: str | None = INITIAL_GUESS,
-    visualise: bool = False,
+    visualize: bool = False,
 ) -> None:
     """Loads words from files and runs the simulation."""
     if initial_guess is not None and len(initial_guess) != WLEN:
@@ -505,11 +519,10 @@ def simulate(
         all_words = {line.strip().lower() for line in f if len(line.strip()) == WLEN}
 
     dashboard = Dashboard()
-    tester = SolutionTester(all_candidates, all_words, dashboard, version=version)
+    tester = SolutionTester(
+        all_candidates, all_words, dashboard, version=version, visualize=visualize
+    )
     tester.test_solver(initial_guess)
-
-    if visualise:
-        plot_results(tester.remaining_counts_per_game, tester.distribution)
 
 
 def manual(
@@ -553,7 +566,7 @@ def manual(
                 feedback: tuple[int, ...] = tuple([int(c) for c in input("Feedback: ")])
             except ValueError:
                 feedback: tuple[int, ...] = ()
-            if len(feedback) == WLEN and all([c in (COLOURS.keys()) for c in feedback]):
+            if len(feedback) == WLEN and all([c in (COLORS.keys()) for c in feedback]):
                 break
             print("Invalid input")
 

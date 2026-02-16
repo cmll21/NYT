@@ -11,7 +11,8 @@ def main() -> None:
     while len(center_letter) != 1 or not center_letter.isalpha():
         center_letter = input("Enter the center letter: ").strip().lower()
     while (
-        len(set(letters)) != 6
+        len(letters) != 6
+        or len(set(letters)) != 6
         or not all(c.isalpha() for c in letters)
         or center_letter in letters
     ):
