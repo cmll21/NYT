@@ -1,49 +1,38 @@
 """
-Connections Solver
-
-Uses SpaCy and KMeans clustering to solve the Connections game one cluster at a time.
-At the end, it prints a summary of all guesses using colored squares:
-Level 0 = Yellow (🟨)
-Level 1 = Green  (🟩)
-Level 2 = Blue   (🟦)
-Level 3 = Purple (🟪)
+Connections core solver logic.
 """
 
-import spacy
-import json
 import random
 import logging
+from collections import deque
+from functools import cache
+
+import numpy as np
+import spacy
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import normalize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-from functools import cache
-import matplotlib.pyplot as plt
-from collections import deque
+from sklearn.preprocessing import normalize
 
-# =============================================================================
-# Configuration & Logging
-# =============================================================================
+from .data import build_word_level_mapping, extract_solution, select_game
+from .views import plot_results, print_final_summary
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
-logging.disable(logging.CRITICAL)  # Disable logging
+logging.disable(logging.CRITICAL)
 
-# =============================================================================
-# Constants & Color Map
-# =============================================================================
-WORDS = 4  # Number of words per cluster (a guess)
-CLUSTERS = 4  # Total clusters in the puzzle (16 words total)
-MISS = 0  # ≤2 words correct
-CLOSE = 1  # Exactly 3 words correct
-HIT = 2  # Exact match to a solution cluster
+WORDS = 4
+CLUSTERS = 4
+MISS = 0
+CLOSE = 1
+HIT = 2
 ANSWERS_FILE = "connections/answers.json"
 
 COLORS = {
-    0: "🟨",  # Level 0 = Yellow
-    1: "🟩",  # Level 1 = Green
-    2: "🟦",  # Level 2 = Blue
-    3: "🟪",  # Level 3 = Purple
+    0: "🟨",
+    1: "🟩",
+    2: "🟦",
+    3: "🟪",
 }
 FEEDBACK_LABELS = {
     MISS: "MISS",
@@ -52,60 +41,15 @@ FEEDBACK_LABELS = {
 }
 
 
-# =============================================================================
-# JSON Loading & Helper Functions
-# =============================================================================
-def load_games(filename: str) -> list[dict[str, object]]:
-    """Load the JSON file containing games."""
-    try:
-        with open(filename, "r") as f:
-            games = json.load(f)
-        return games
-    except Exception as e:
-        logger.error(f"Error loading file {filename}: {e}")
-        raise
-
-
-def pick_random_game(games: list[dict[str, object]]) -> dict[str, object]:
-    """Randomly select one game from the list."""
-    return random.choice(games)
-
-
-def extract_solution(game: dict[str, object]) -> list[set[str]]:
-    """Extract the solution groups from the game."""
-    return [set(answer["members"]) for answer in game["answers"]]
-
-
-def build_word_level_mapping(game: dict[str, object]) -> dict[str, int]:
-    """Build a dictionary mapping each word to its level."""
-    mapping = {}
-    for answer in game["answers"]:
-        level = answer["level"]
-        for word in answer["members"]:
-            mapping[word] = level
-    return mapping
-
-
-# =============================================================================
-# Game & Solver Class Definitions
-# =============================================================================
 class ConnectionsGame:
     def __init__(self, solution: list[set[str]], all_words: set[str]) -> None:
         self.solution = solution
-        self.all_words = all_words  # Pool of all words
+        self.all_words = all_words
 
     def valid_guess(self, guess: list[str]) -> bool:
-        """A guess must be 4 words and a subset of the overall word pool."""
         return set(guess).issubset(self.all_words) and len(guess) == WORDS
 
     def check_guess(self, guess: list[str]) -> int:
-        """
-        Check a candidate guess against the solution groups.
-        Returns:
-            HIT (2) if the guess exactly matches a solution cluster,
-            CLOSE (1) if it differs by exactly one word,
-            MISS (0) otherwise.
-        """
         guess_set = set(guess)
         if guess_set in self.solution:
             return HIT
@@ -121,14 +65,10 @@ class ConnectionsSolver:
     def __init__(self) -> None:
         self.nlp = spacy.load("en_core_web_lg")
         self.guess_history: list[tuple[list[str], int]] = []
-        self.locked_words: deque[str] = deque(
-            maxlen=3
-        )  # Up to 3 locked words (in order)
-        self.tried_words_per_cluster: dict[
-            str, set[str]
-        ] = {}  # Tracks tried words per cluster
-        self.reached_close = False  # Tracks if a CLOSE guess was hit
-        self.feedback = MISS  # Most recent feedback
+        self.locked_words: deque[str] = deque(maxlen=3)
+        self.tried_words_per_cluster: dict[str, set[str]] = {}
+        self.reached_close = False
+        self.feedback = MISS
 
     def get_spacy_vectors(self, words: list[str]) -> np.ndarray:
         return np.array([self.nlp(word).vector for word in words])
@@ -140,7 +80,6 @@ class ConnectionsSolver:
         kmeans = KMeans(n_clusters=n_clusters, random_state=0)
         labels = kmeans.fit_predict(word_vectors)
 
-        # Group words by cluster
         clusters = {i: [] for i in range(n_clusters)}
         for idx, label in enumerate(labels):
             clusters[label].append(words[idx])
@@ -155,14 +94,11 @@ class ConnectionsSolver:
             for i in range(n_clusters)
         }
 
-        # Sort clusters by confidence (lower average distance first)
         sorted_clusters = sorted(
             clusters.items(), key=lambda item: cluster_confidence[item[0]]
         )
 
-        # Prepare candidate clusters: first WORDS words per cluster
         new_clusters = {c: words[:WORDS] for c, words in sorted_clusters}
-        # Redistribute overflow words into clusters with less than WORDS words
         overflow = []
         for c, words_in_cluster in clusters.items():
             if len(words_in_cluster) > WORDS:
@@ -176,11 +112,9 @@ class ConnectionsSolver:
 
     @cache
     def word_similarity(self, word1: str, word2: str) -> float:
-        # Compute spaCy vectors
         doc1 = self.nlp(word1)
         doc2 = self.nlp(word2)
 
-        # If one of the vectors is empty, fallback to TF-IDF similarity.
         if doc1.vector_norm == 0 or doc2.vector_norm == 0:
             return self.tfidf_similarity(word1, word2)
 
@@ -188,11 +122,8 @@ class ConnectionsSolver:
 
     @cache
     def tfidf_similarity(self, word1: str, word2: str) -> float:
-        # Create a TF-IDF vectoriser for just the two words.
         vectorizer = TfidfVectorizer()
         tfidf_matrix = vectorizer.fit_transform([word1, word2])
-
-        # Compute cosine similarity between the two TF-IDF vectors.
         sim = cosine_similarity(tfidf_matrix[0], tfidf_matrix[1])
         return sim[0][0]
 
@@ -203,10 +134,8 @@ class ConnectionsSolver:
     def find_best_replacement(
         self, pool: set[str], used_words: set[str], candidate: list[str]
     ) -> str:
-        """Return the most similar unused word from the pool."""
         unused = list(pool - used_words - set(candidate))
         if not unused:
-            # Fallback if all words have been tried
             return random.choice(list(pool - set(candidate)))
         unused.sort(key=lambda w: self.average_similarity(w, candidate), reverse=True)
         return unused[0]
@@ -214,13 +143,8 @@ class ConnectionsSolver:
     def modify_candidate(
         self, candidate: list[str], pool: set[str], cluster_id: str
     ) -> list[str]:
-        """
-        Modify the candidate guess while preserving locked words.
-        Replaces the least fitting non-locked word with a new candidate.
-        """
         candidate_copy = candidate.copy()
 
-        # Ensure locked words remain
         for word in self.locked_words:
             if word not in candidate_copy:
                 if len(candidate_copy) < WORDS:
@@ -237,7 +161,6 @@ class ConnectionsSolver:
                         candidate_copy.remove(worst)
                         candidate_copy.append(word)
 
-        # Replace one of the non-locked words
         non_locked = [w for w in candidate_copy if w not in self.locked_words]
         if non_locked:
             worst = min(
@@ -247,18 +170,15 @@ class ConnectionsSolver:
             if self.reached_close:
                 self.locked_words.append(worst)
             elif self.feedback == MISS and len(non_locked) > 1:
-                # Optionally remove another low-similarity word if still in MISS mode
                 next_worst = min(
                     [w for w in non_locked if w != worst],
                     key=lambda w: self.average_similarity(w, candidate_copy),
                 )
                 candidate_copy.remove(next_worst)
 
-        # Track tried words for this cluster
         if cluster_id not in self.tried_words_per_cluster:
             self.tried_words_per_cluster[cluster_id] = set()
 
-        # Refill candidate until it has WORDS items
         while len(candidate_copy) < WORDS:
             new_word = self.find_best_replacement(
                 pool, self.tried_words_per_cluster[cluster_id], candidate_copy
@@ -272,7 +192,6 @@ class ConnectionsSolver:
         pool = set(game.all_words)
         tried = set()
 
-        # Determine number of clusters based on pool size
         n_clusters = max(1, len(pool) // WORDS)
         clusters = self.cluster_words(list(pool), n_clusters)
         candidate = clusters[0][1][:WORDS]
@@ -294,7 +213,6 @@ class ConnectionsSolver:
                 logger.info("Reached CLOSE!")
                 self.reached_close = True
 
-            # If feedback is CLOSE and there are locked words, remove the most recent lock
             if self.feedback == CLOSE and self.locked_words:
                 removed = self.locked_words.pop()
                 logger.info(f"Removing locked word: {removed}")
@@ -315,65 +233,6 @@ class ConnectionsSolver:
             solved_clusters.append(solved)
             game.all_words -= set(solved)
         return solved_clusters
-
-
-# =============================================================================
-# Output Functions
-# =============================================================================
-def print_final_summary(
-    game_id: int,
-    guess_history: list[tuple[list[str], int]],
-    word_to_level: dict[str, int],
-) -> None:
-    """Print summary of all guess attempts using colored squares."""
-    print("Connections")
-    print(f"Puzzle #{game_id}")
-    for guess, _ in guess_history:
-        row = "".join([COLORS[word_to_level[word]] for word in guess])
-        print(row)
-    print(f"\nTotal mistakes: {len(guess_history) - CLUSTERS}")
-
-
-def plot_results(guess_history: list[tuple[list[str], int]]) -> None:
-    """Plot solver results using Matplotlib."""
-    cluster_counts = [sum(1 for _, fb in guess_history if fb == i) for i in range(3)]
-    labels = ["Misses (0)", "Close (1)", "Correct (2)"]
-    colors = ["gold", "lightblue", "green"]
-
-    plt.figure(figsize=(10, 4))
-    plt.subplot(1, 2, 1)
-    plt.pie(
-        cluster_counts, labels=labels, autopct="%1.1f%%", colors=colors, startangle=140
-    )
-    plt.title("Connections Guess Distribution")
-
-    plt.subplot(1, 2, 2)
-    attempts = list(range(1, len(guess_history) + 1))
-    feedback_values = [fb for _, fb in guess_history]
-    plt.bar(attempts, feedback_values, color="blue")
-    plt.xlabel("Attempt Number")
-    plt.ylabel("Feedback Type (0=Miss, 1=Close, 2=Correct)")
-    plt.title("Guess Feedback Over Time")
-
-    plt.tight_layout()
-    plt.show()
-
-
-# =============================================================================
-# Simulation Functions
-# =============================================================================
-def select_game(filename: str = ANSWERS_FILE, game_id: int = None):
-    games = load_games(filename)
-    if game_id is not None:
-        selected_game = next((game for game in games if game["id"] == game_id), None)
-    else:
-        selected_game = pick_random_game(games)
-
-    if not selected_game:
-        logger.error("No game found with the provided ID.")
-        return
-
-    return selected_game
 
 
 def simulate(
@@ -430,9 +289,6 @@ def manual(filename: str = ANSWERS_FILE, game_id: int = None) -> None:
     print_final_summary(game_id, solver.guess_history, word_to_level)
 
 
-# =============================================================================
-# Main Execution
-# =============================================================================
 def main() -> None:
     simulate()
 

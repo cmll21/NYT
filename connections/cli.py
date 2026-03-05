@@ -1,5 +1,5 @@
 import argparse
-from connections import simulate, manual
+from .solver import simulate, manual
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Connections Game Solver CLI")

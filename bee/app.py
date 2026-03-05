@@ -1,13 +1,14 @@
-from nltk.corpus import words
+"""
+Bee app orchestration.
+"""
+
+from .solver import generate_words
 
 
-def main() -> None:
-    word_list = set(words.words())
-
+def manual() -> None:
     center_letter = ""
     letters = ""
 
-    # Handle input
     while len(center_letter) != 1 or not center_letter.isalpha():
         center_letter = input("Enter the center letter: ").strip().lower()
     while (
@@ -18,13 +19,16 @@ def main() -> None:
     ):
         letters = input("Enter the 6 surrounding letters: ").strip().lower()
 
-    for word in word_list:
-        if (
-            len(word) >= 4
-            and center_letter in word
-            and all(c in letters for c in word if c != center_letter)
-        ):
-            print(word)
+    for word in generate_words(center_letter, letters):
+        print(word)
+
+
+def simulate(center_letter: str, letters: str) -> list[str]:
+    return generate_words(center_letter, letters)
+
+
+def main() -> None:
+    manual()
 
 
 if __name__ == "__main__":
